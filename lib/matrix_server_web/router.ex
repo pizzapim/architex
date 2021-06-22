@@ -12,5 +12,7 @@ defmodule MatrixServerWeb.Router do
       post "/register", AccountController, :register
       get "/register/available", AccountController, :available
     end
+
+    get "/client/versions", InfoController, :versions
   end
 end

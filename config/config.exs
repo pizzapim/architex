@@ -28,6 +28,11 @@ config :phoenix, :json_library, Jason
 
 config :matrix_server, MatrixServer.Repo, migration_timestamps: [type: :utc_datetime]
 
+config :cors_plug,
+  origin: ["*"],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  headers: ["Origin", "X-Requested-With", "Content-Type", "Accept", "Authorization"]
+
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 import_config "#{Mix.env()}.exs"
