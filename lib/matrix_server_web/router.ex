@@ -5,7 +5,12 @@ defmodule MatrixServerWeb.Router do
     plug :accepts, ["json"]
   end
 
-  scope "/api", MatrixServerWeb do
+  scope "/_matrix", MatrixServerWeb do
     pipe_through :api
+
+    scope "/client/r0", as: :client do
+      post "/register", AccountController, :register
+      get "/register/available", AccountController, :available
+    end
   end
 end

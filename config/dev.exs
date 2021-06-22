@@ -2,8 +2,8 @@ use Mix.Config
 
 # Configure your database
 config :matrix_server, MatrixServer.Repo,
-  username: "postgres",
-  password: "postgres",
+  username: "matrix_server",
+  password: "matrix_server",
   database: "matrix_server_dev",
   hostname: "localhost",
   show_sensitive_data_on_connection_error: true,
@@ -55,3 +55,5 @@ config :phoenix, :stacktrace_depth, 20
 
 # Initialize plugs at runtime for faster development compilation
 config :phoenix, :plug_init_mode, :runtime
+
+config :matrix_server, :server_name, "localhost"
