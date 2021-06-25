@@ -1,13 +1,15 @@
 defmodule MatrixServerWeb.Router do
   use MatrixServerWeb, :router
 
+  alias MatrixServerWeb.Plug.Authenticate
+
   pipeline :public do
     plug :accepts, ["json"]
   end
 
   pipeline :authenticated do
     plug :accepts, ["json"]
-    plug MatrixServerWeb.Authenticate
+    plug Authenticate
   end
 
   scope "/_matrix", MatrixServerWeb do

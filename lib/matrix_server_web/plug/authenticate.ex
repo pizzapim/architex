@@ -1,11 +1,12 @@
-defmodule MatrixServerWeb.Authenticate do
+defmodule MatrixServerWeb.Plug.Authenticate do
+  import MatrixServerWeb.Plug.Error
   import Plug.Conn
   import Phoenix.Controller, only: [json: 2]
 
   alias MatrixServer.Account
   alias Plug.Conn
 
-  def init(options), do: options
+  def init(opts), do: opts
 
   def call(%Conn{params: %{"access_token" => access_token}} = conn, _opts) do
     authenticate(conn, access_token)
@@ -17,12 +18,7 @@ defmodule MatrixServerWeb.Authenticate do
         authenticate(conn, access_token)
 
       _ ->
-        data = %{errcode: "M_MISSING_TOKEN", error: "Access token missing."}
-
-        conn
-        |> put_status(401)
-        |> json(data)
-        |> halt()
+        put_error(conn, :missing_token)
     end
   end
 
@@ -34,12 +30,7 @@ defmodule MatrixServerWeb.Authenticate do
         |> assign(:device, device)
 
       nil ->
-        data = %{errcode: "M_UNKNOWN_TOKEN", error: "Invalid access token."}
-
-        conn
-        |> put_status(401)
-        |> json(data)
-        |> halt()
+        put_error(conn, :unknown_token)
     end
   end
 end

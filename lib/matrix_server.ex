@@ -30,17 +30,6 @@ defmodule MatrixServer do
     |> validate_required(required)
   end
 
-  def generate_error(errcode) do
-    {get_errcode_status(errcode), %{errcode: errcode, error: get_errcode_error(errcode)}}
-  end
-
-  # TODO: make a plug for this?
-  def get_errcode_error("M_BAD_JSON"), do: "Bad request."
-  def get_errcode_error("M_USER_IN_USE"), do: "Username is already taken."
-  def get_errcode_error("M_INVALID_USERNAME"), do: "Invalid username."
-
-  def get_errcode_status(_), do: 400
-
   def get_mxid(localpart) when is_binary(localpart) do
     "@#{localpart}:#{server_name()}"
   end

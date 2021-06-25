@@ -2,6 +2,7 @@ defmodule MatrixServerWeb.AuthController do
   use MatrixServerWeb, :controller
 
   import MatrixServer
+  import MatrixServerWeb.Plug.Error
 
   alias MatrixServer.{Repo, Account}
   alias Ecto.Changeset
@@ -38,7 +39,7 @@ defmodule MatrixServerWeb.AuthController do
           {200, data}
 
         {:error, error} ->
-          generate_error(error)
+          put_error(conn, error)
       end
 
     conn
@@ -48,11 +49,7 @@ defmodule MatrixServerWeb.AuthController do
 
   def register(conn, %{"auth" => _}) do
     # Other login types are unsupported for now.
-    data = %{errcode: "M_FORBIDDEN", error: "Login type not supported"}
-
-    conn
-    |> put_status(400)
-    |> json(data)
+    put_error(conn, :forbidden)
   end
 
   def register(conn, _params) do
@@ -80,9 +77,9 @@ defmodule MatrixServerWeb.AuthController do
   end
 
   defp get_register_error(%Changeset{errors: [error | _]}), do: get_register_error(error)
-  defp get_register_error({:localpart, {_, [{:constraint, :unique} | _]}}), do: "M_USER_IN_USE"
-  defp get_register_error({:localpart, {_, [{:validation, _} | _]}}), do: "M_INVALID_USERNAME"
-  defp get_register_error(_), do: "M_BAD_JSON"
+  defp get_register_error({:localpart, {_, [{:constraint, :unique} | _]}}), do: :user_in_use
+  defp get_register_error({:localpart, {_, [{:validation, _} | _]}}), do: :invalid_username
+  defp get_register_error(_), do: :bad_json
 
   defp register_schema do
     types = %{
