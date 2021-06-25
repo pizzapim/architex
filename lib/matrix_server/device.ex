@@ -23,8 +23,12 @@ defmodule MatrixServer.Device do
     |> unique_constraint([:localpart, :device_id], name: :devices_pkey)
   end
 
-  def generate_access_token(repo, %{device: %Device{localpart: localpart, device_id: device_id} = device}) do
-    access_token = Phoenix.Token.encrypt(MatrixServerWeb.Endpoint, "access_token", {localpart, device_id})
+  def generate_access_token(repo, %{
+        device: %Device{localpart: localpart, device_id: device_id} = device
+      }) do
+    access_token =
+      Phoenix.Token.encrypt(MatrixServerWeb.Endpoint, "access_token", {localpart, device_id})
+
     device
     |> change(%{access_token: access_token})
     |> repo.update()

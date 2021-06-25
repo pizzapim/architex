@@ -1,6 +1,10 @@
 defmodule MatrixServerWeb.AccountController do
   use MatrixServerWeb, :controller
+
+  import MatrixServer, only: [get_mxid: 1]
+
   alias MatrixServer.Account
+  alias Plug.Conn
 
   def available(conn, params) do
     localpart = Map.get(params, "username", "")
@@ -19,6 +23,14 @@ defmodule MatrixServerWeb.AccountController do
 
     conn
     |> put_status(status)
+    |> json(data)
+  end
+
+  def whoami(%Conn{assigns: %{account: %Account{localpart: localpart}}} = conn, _params) do
+    data = %{user_id: get_mxid(localpart)}
+
+    conn
+    |> put_status(200)
     |> json(data)
   end
 end

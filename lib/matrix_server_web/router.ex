@@ -1,12 +1,17 @@
 defmodule MatrixServerWeb.Router do
   use MatrixServerWeb, :router
 
-  pipeline :api do
+  pipeline :public do
     plug :accepts, ["json"]
   end
 
+  pipeline :authenticated do
+    plug :accepts, ["json"]
+    plug MatrixServerWeb.Authenticate
+  end
+
   scope "/_matrix", MatrixServerWeb do
-    pipe_through :api
+    pipe_through :public
 
     scope "/client/r0", as: :client do
       post "/register", AuthController, :register
@@ -15,5 +20,13 @@ defmodule MatrixServerWeb.Router do
     end
 
     get "/client/versions", InfoController, :versions
+  end
+
+  scope "/_matrix", MatrixServerWeb do
+    pipe_through :authenticated
+
+    scope "/client/r0", as: :client do
+      get "/account/whoami", AccountController, :whoami
+    end
   end
 end

@@ -13,6 +13,7 @@ defmodule MatrixServer.Repo.Migrations.AddDevicesTable do
           null: false
     end
 
+    # Compound primary already indexes device_id.
     create index(:devices, [:localpart])
   end
 end

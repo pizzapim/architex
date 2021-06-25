@@ -44,6 +44,15 @@ defmodule MatrixServer.Account do
     |> Multi.run(:device_with_access_token, &Device.generate_access_token/2)
   end
 
+  def get_by_access_token(access_token) do
+    from(a in Account,
+      join: d in assoc(a, :devices),
+      where: d.access_token == ^access_token,
+      preload: [devices: d]
+    )
+    |> Repo.one()
+  end
+
   def changeset(account, params \\ %{}) do
     account
     |> cast(params, [:localpart, :password_hash])
