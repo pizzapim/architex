@@ -1,7 +1,11 @@
 defmodule MatrixServer.Account do
   use Ecto.Schema
+
+  import MatrixServer
   import Ecto.{Changeset, Query}
-  alias MatrixServer.{Repo, Account}
+
+  alias MatrixServer.{Repo, Account, Device}
+  alias Ecto.Multi
 
   @max_mxid_length 255
   @localpart_regex ~r/^([a-z0-9\._=\/])+$/
@@ -9,7 +13,7 @@ defmodule MatrixServer.Account do
   @primary_key {:localpart, :string, []}
   schema "accounts" do
     field :password_hash, :string, redact: true
-
+    has_many :devices, Device, foreign_key: :localpart
     timestamps(updated_at: false)
   end
 
@@ -30,9 +34,19 @@ defmodule MatrixServer.Account do
     end
   end
 
-  def changeset(%Account{} = account, attrs) do
+  def register(params) do
+    Multi.new()
+    |> Multi.insert(:account, changeset(%Account{}, params))
+    |> Multi.insert(:device, fn %{account: account} ->
+      Ecto.build_assoc(account, :devices)
+      |> Device.changeset(params)
+    end)
+    |> Multi.run(:device_with_access_token, &Device.generate_access_token/2)
+  end
+
+  def changeset(account, params \\ %{}) do
     account
-    |> cast(attrs, [:localpart, :password_hash])
+    |> cast(params, [:localpart, :password_hash])
     |> validate_required([:localpart, :password_hash])
     |> validate_length(:password_hash, max: 60)
     |> validate_format(:localpart, @localpart_regex)
@@ -43,9 +57,5 @@ defmodule MatrixServer.Account do
   defp localpart_length do
     # Subtract the "@" and ":" in the MXID.
     @max_mxid_length - 2 - String.length(server_name())
-  end
-
-  defp server_name do
-    Application.get_env(:matrix_server, :server_name)
   end
 end

@@ -2,10 +2,6 @@ defmodule MatrixServerWeb.AccountController do
   use MatrixServerWeb, :controller
   alias MatrixServer.Account
 
-  def register(conn, _params) do
-    conn
-  end
-
   def available(conn, params) do
     localpart = Map.get(params, "username", "")
 

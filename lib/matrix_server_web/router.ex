@@ -9,7 +9,8 @@ defmodule MatrixServerWeb.Router do
     pipe_through :api
 
     scope "/client/r0", as: :client do
-      post "/register", AccountController, :register
+      post "/register", AuthController, :register
+      get "/login", AuthController, :login
       get "/register/available", AccountController, :available
     end
 
