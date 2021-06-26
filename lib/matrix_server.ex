@@ -37,4 +37,18 @@ defmodule MatrixServer do
   def server_name do
     Application.get_env(:matrix_server, :server_name)
   end
+
+  def update_map_entry(map, old_key, new_key) do
+    update_map_entry(map, old_key, new_key, &Function.identity/1)
+  end
+
+  def update_map_entry(map, old_key, new_key, fun) when is_map_key(map, old_key) do
+    value = Map.fetch!(map, old_key)
+
+    map
+    |> Map.put(new_key, fun.(value))
+    |> Map.delete(old_key)
+  end
+
+  def update_map_entry(map, _, _, _), do: map
 end

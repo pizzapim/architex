@@ -33,4 +33,13 @@ defmodule MatrixServer.Device do
     |> change(%{access_token: access_token})
     |> repo.update()
   end
+
+  def generate_device_id(%Account{localpart: localpart}) do
+    time_string =
+      DateTime.utc_now()
+      |> DateTime.to_unix()
+      |> Integer.to_string()
+
+    "#{localpart}_#{time_string}"
+  end
 end

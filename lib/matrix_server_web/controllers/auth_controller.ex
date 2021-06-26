@@ -3,48 +3,49 @@ defmodule MatrixServerWeb.AuthController do
 
   import MatrixServer
   import MatrixServerWeb.Plug.Error
+  import Ecto.Changeset, only: [apply_changes: 1]
 
   alias MatrixServer.{Repo, Account}
+  alias MatrixServerWeb.API.Register
   alias Ecto.Changeset
 
-  @login_type "m.login.dummy"
+  @register_type "m.login.dummy"
+  @login_type "m.login.password"
 
-  def register(conn, %{"auth" => %{"type" => @login_type}} = params) do
-    # User has started an auth flow.
-    result =
-      case sanitize_register_params(params) do
-        {:ok, params} ->
-          case Repo.transaction(Account.register(params)) do
-            {:ok, changeset} -> {:ok, changeset}
-            {:error, _, changeset, _} -> {:error, get_register_error(changeset)}
-          end
+  def register(conn, %{"auth" => %{"type" => @register_type}} = params) do
+    case Register.changeset(params) do
+      %Changeset{valid?: true} = cs ->
+        input =
+          apply_changes(cs)
+          |> Map.from_struct()
+          |> update_map_entry(:initial_device_display_name, :device_name)
+          |> update_map_entry(:username, :localpart)
+          |> update_map_entry(:password, :password_hash, &Bcrypt.hash_pwd_salt/1)
 
-        {:error, changeset} ->
-          {:error, get_register_error(changeset)}
-      end
+        case Account.register(%Account{}, input) |> Repo.transaction() do
+          {:ok, %{device_with_access_token: device}} ->
+            data = %{user_id: get_mxid(device.localpart)}
 
-    {status, data} =
-      case result do
-        {:ok, %{device_with_access_token: device}} ->
-          data = %{user_id: get_mxid(device.localpart)}
+            data =
+              if not input.inhibit_login do
+                data
+                |> Map.put(:device_id, device.device_id)
+                |> Map.put(:access_token, device.access_token)
+              else
+                data
+              end
 
-          data =
-            if Map.get(params, "inhibit_login", false) == false do
-              extra = %{device_id: device.device_id, access_token: device.access_token}
-              Map.merge(data, extra)
-            else
-              data
-            end
+            conn
+            |> put_status(200)
+            |> json(data)
 
-          {200, data}
+          {:error, _, cs, _} ->
+            Register.handle_error(conn, cs)
+        end
 
-        {:error, error} ->
-          put_error(conn, error)
-      end
-
-    conn
-    |> put_status(status)
-    |> json(data)
+      _ ->
+        put_error(conn, :bad_json)
+    end
   end
 
   def register(conn, %{"auth" => _}) do
@@ -55,7 +56,7 @@ defmodule MatrixServerWeb.AuthController do
   def register(conn, _params) do
     # User has not started an auth flow.
     data = %{
-      flows: [%{stages: [@login_type]}],
+      flows: [%{stages: [@register_type]}],
       params: %{}
     }
 
@@ -64,46 +65,22 @@ defmodule MatrixServerWeb.AuthController do
     |> json(data)
   end
 
-  defp sanitize_register_params(params) do
-    changeset =
-      validate_api_schema(params, register_schema())
-      |> convert_change(:username, :localpart)
-      |> convert_change(:password, :password_hash, &Bcrypt.hash_pwd_salt/1)
-
-    case changeset do
-      %Changeset{valid?: true, changes: changes} -> {:ok, changes}
-      _ -> {:error, changeset}
-    end
-  end
-
-  defp get_register_error(%Changeset{errors: [error | _]}), do: get_register_error(error)
-  defp get_register_error({:localpart, {_, [{:constraint, :unique} | _]}}), do: :user_in_use
-  defp get_register_error({:localpart, {_, [{:validation, _} | _]}}), do: :invalid_username
-  defp get_register_error(_), do: :bad_json
-
-  defp register_schema do
-    types = %{
-      device_id: :string,
-      initial_device_display_name: :string,
-      display_name: :string,
-      password: :string,
-      username: :string,
-      localpart: :string,
-      password_hash: :string,
-      access_token: :string
-    }
-
-    allowed = [:device_id, :initial_device_display_name, :username, :password]
-    required = [:username, :password]
-
-    {types, allowed, required}
-  end
-
-  def login(conn, _params) do
+  def login_types(conn, _params) do
     data = %{flows: [%{type: @login_type}]}
 
     conn
     |> put_status(200)
     |> json(data)
+  end
+
+  def login(conn, %{"type" => "m.login.password"}) do
+    conn
+    |> put_status(200)
+    |> json(%{})
+  end
+
+  def login(conn, _params) do
+    # Login type m.login.token is unsupported for now.
+    put_error(conn, :forbidden)
   end
 end

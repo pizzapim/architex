@@ -17,7 +17,8 @@ defmodule MatrixServerWeb.Router do
 
     scope "/client/r0", as: :client do
       post "/register", AuthController, :register
-      get "/login", AuthController, :login
+      get "/login", AuthController, :login_types
+      post "/login", AuthController, :login
       get "/register/available", AccountController, :available
     end
 
@@ -30,5 +31,9 @@ defmodule MatrixServerWeb.Router do
     scope "/client/r0", as: :client do
       get "/account/whoami", AccountController, :whoami
     end
+  end
+
+  scope "/", MatrixServerWeb do
+    match :*, "/*path", InfoController, :unrecognized
   end
 end

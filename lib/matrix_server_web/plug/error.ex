@@ -7,6 +7,7 @@ defmodule MatrixServerWeb.Plug.Error do
     user_in_use: {400, "M_USE_IN_USE", "Username is already taken."},
     invalid_username: {400, "M_INVALID_USERNAME", "Invalid username."},
     forbidden: {400, "M_FORBIDDEN", "The requested action is forbidden."},
+    unrecognized: {400, "M_UNRECOGNIZED", "Unrecognized request."},
     unknown_token: {401, "M_UNKNOWN_TOKEN", "Invalid access token."},
     missing_token: {401, "M_MISSING_TOKEN", "Access token required."}
   }

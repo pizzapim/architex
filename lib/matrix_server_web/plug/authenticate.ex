@@ -1,7 +1,6 @@
 defmodule MatrixServerWeb.Plug.Authenticate do
   import MatrixServerWeb.Plug.Error
   import Plug.Conn
-  import Phoenix.Controller, only: [json: 2]
 
   alias MatrixServer.Account
   alias Plug.Conn
