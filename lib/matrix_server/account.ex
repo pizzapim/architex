@@ -47,12 +47,11 @@ defmodule MatrixServer.Account do
     |> Multi.run(:device_with_access_token, &Device.insert_new_access_token/2)
   end
 
-  def get_by_access_token(access_token) do
-    from(a in Account,
-      join: d in assoc(a, :devices),
-      where: d.access_token == ^access_token,
-      preload: [devices: d]
-    )
+  def by_access_token(access_token) do
+    Device
+    |> where([d], d.access_token == ^access_token)
+    |> join(:inner, [d], a in assoc(d, :account))
+    |> select([d, a], {a, d})
     |> Repo.one()
   end
 

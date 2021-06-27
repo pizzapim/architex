@@ -1,7 +1,9 @@
 defmodule MatrixServer.Device do
   use Ecto.Schema
-  import Ecto.Changeset
-  alias MatrixServer.{Account, Device}
+
+  import Ecto.{Changeset, Query}
+
+  alias MatrixServer.{Account, Device, Repo}
 
   @primary_key false
   schema "devices" do
@@ -44,5 +46,24 @@ defmodule MatrixServer.Device do
       |> Integer.to_string()
 
     "#{localpart}_#{time_string}"
+  end
+
+  def login(account, device_id, access_token, params) do
+    update_query =
+      from(d in Device)
+      |> update(set: [access_token: ^access_token, device_id: ^device_id])
+
+    update_query =
+      if params[:display_name] != nil do
+        update(update_query, set: [display_name: ^params.display_name])
+      else
+        update_query
+      end
+
+    Ecto.build_assoc(account, :devices)
+    |> Map.put(:device_id, device_id)
+    |> Map.put(:access_token, access_token)
+    |> Device.changeset(params)
+    |> Repo.insert(on_conflict: update_query, conflict_target: [:localpart, :device_id])
   end
 end

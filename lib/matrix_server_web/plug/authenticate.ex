@@ -22,8 +22,8 @@ defmodule MatrixServerWeb.Plug.Authenticate do
   end
 
   defp authenticate(conn, access_token) do
-    case Account.get_by_access_token(access_token) do
-      %Account{devices: [device]} = account ->
+    case Account.by_access_token(access_token) do
+      {account, device} ->
         conn
         |> assign(:account, account)
         |> assign(:device, device)

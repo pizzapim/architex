@@ -130,30 +130,9 @@ defmodule MatrixServerWeb.AuthController do
             device_id = Map.get(params, :device_id, Device.generate_device_id(localpart))
             access_token = Device.generate_access_token(localpart, device_id)
 
-            update_query =
-              from(d in Device)
-              |> update(set: [access_token: ^access_token, device_id: ^device_id])
-
-            update_query =
-              if params[:display_name] != nil do
-                update(update_query, set: [display_name: ^params.display_name])
-              else
-                update_query
-              end
-
-            result =
-              Ecto.build_assoc(account, :devices)
-              |> Map.put(:device_id, device_id)
-              |> Map.put(:access_token, access_token)
-              |> Device.changeset(params)
-              |> repo.insert(on_conflict: update_query, conflict_target: [:localpart, :device_id])
-
-            case result do
-              {:ok, device} ->
-                device
-
-              {:error, _cs} ->
-                repo.rollback(:forbidden)
+            case Device.login(account, device_id, access_token, params) do
+              {:ok, device} -> device
+              {:error, _cs} -> repo.rollback(:forbidden)
             end
           else
             repo.rollback(:forbidden)

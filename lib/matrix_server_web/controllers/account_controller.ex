@@ -4,7 +4,7 @@ defmodule MatrixServerWeb.AccountController do
   import MatrixServer
   import MatrixServerWeb.Plug.Error
 
-  alias MatrixServer.Account
+  alias MatrixServer.{Account, Repo}
   alias Plug.Conn
 
   def available(conn, params) do
@@ -27,5 +27,25 @@ defmodule MatrixServerWeb.AccountController do
     conn
     |> put_status(200)
     |> json(data)
+  end
+
+  def logout(%Conn{assigns: %{device: device}} = conn, _params) do
+    case Repo.delete(device) do
+      {:ok, _} ->
+        conn
+        |> put_status(200)
+        |> json(%{})
+
+      {:error, _} ->
+        put_error(conn, :unknown)
+    end
+  end
+
+  def logout_all(%Conn{assigns: %{account: account}} = conn, _params) do
+    Repo.delete_all(Ecto.assoc(account, :devices))
+
+    conn
+    |> put_status(200)
+    |> json(%{})
   end
 end
