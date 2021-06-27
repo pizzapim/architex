@@ -34,17 +34,17 @@ defmodule MatrixServer.Account do
     end
   end
 
-  def register(account, params) do
+  def register(params) do
     Multi.new()
-    |> Multi.insert(:account, changeset(account, params))
+    |> Multi.insert(:account, changeset(%Account{}, params))
     |> Multi.insert(:device, fn %{account: account} ->
-      device_id = Device.generate_device_id(account)
+      device_id = Device.generate_device_id(account.localpart)
 
       Ecto.build_assoc(account, :devices)
       |> Map.put(:device_id, device_id)
       |> Device.changeset(params)
     end)
-    |> Multi.run(:device_with_access_token, &Device.generate_access_token/2)
+    |> Multi.run(:device_with_access_token, &Device.insert_new_access_token/2)
   end
 
   def get_by_access_token(access_token) do

@@ -18,23 +18,26 @@ defmodule MatrixServer.Device do
 
   def changeset(device, params \\ %{}) do
     device
-    |> cast(params, [:localpart, :device_id, :access_token, :display_name])
+    |> cast(params, [:display_name, :device_id])
     |> validate_required([:localpart, :device_id])
     |> unique_constraint([:localpart, :device_id], name: :devices_pkey)
   end
 
-  def generate_access_token(repo, %{
+  def insert_new_access_token(repo, %{
         device: %Device{localpart: localpart, device_id: device_id} = device
       }) do
-    access_token =
-      Phoenix.Token.encrypt(MatrixServerWeb.Endpoint, "access_token", {localpart, device_id})
+    access_token = generate_access_token(localpart, device_id)
 
     device
     |> change(%{access_token: access_token})
     |> repo.update()
   end
 
-  def generate_device_id(%Account{localpart: localpart}) do
+  def generate_access_token(localpart, device_id) do
+    Phoenix.Token.encrypt(MatrixServerWeb.Endpoint, "access_token", {localpart, device_id})
+  end
+
+  def generate_device_id(localpart) do
     time_string =
       DateTime.utc_now()
       |> DateTime.to_unix()

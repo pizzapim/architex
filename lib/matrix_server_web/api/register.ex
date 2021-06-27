@@ -4,9 +4,9 @@ defmodule MatrixServerWeb.API.Register do
   import Ecto.Changeset
   import MatrixServerWeb.Plug.Error
 
-  alias __MODULE__
   alias Ecto.Changeset
 
+  @primary_key false
   embedded_schema do
     field :device_id, :string
     field :initial_device_display_name, :string
@@ -16,7 +16,7 @@ defmodule MatrixServerWeb.API.Register do
   end
 
   def changeset(params) do
-    %Register{}
+    %__MODULE__{}
     |> cast(params, [
       :device_id,
       :initial_device_display_name,
