@@ -7,14 +7,11 @@ defmodule MatrixServer.Application do
 
   def start(_type, _args) do
     children = [
-      # Start the Ecto repository
       MatrixServer.Repo,
-      # Start the Telemetry supervisor
       MatrixServerWeb.Telemetry,
-      # Start the PubSub system
       {Phoenix.PubSub, name: MatrixServer.PubSub},
-      # Start the Endpoint (http/https)
-      MatrixServerWeb.Endpoint
+      MatrixServerWeb.Endpoint,
+      MatrixServer.RoomServer
       # Start a worker by calling: MatrixServer.Worker.start_link(arg)
       # {MatrixServer.Worker, arg}
     ]

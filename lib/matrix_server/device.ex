@@ -8,7 +8,7 @@ defmodule MatrixServer.Device do
   @primary_key false
   schema "devices" do
     field :device_id, :string, primary_key: true
-    field :access_token, :string
+    field :access_token, :string, redact: true
     field :display_name, :string
 
     belongs_to :account, Account,

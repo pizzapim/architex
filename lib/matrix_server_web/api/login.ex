@@ -4,6 +4,8 @@ defmodule MatrixServerWeb.API.Login do
 
   import Ecto.Changeset
 
+  # TODO: Maybe use inline embedded schema here
+  # https://hexdocs.pm/ecto/Ecto.Schema.html#embeds_one/3
   defmodule MatrixServerWeb.API.Login.Identifier do
     use Ecto.Schema
 
@@ -15,9 +17,9 @@ defmodule MatrixServerWeb.API.Login do
       field :user, :string
     end
 
-    def changeset(identifier, attrs) do
+    def changeset(identifier, params) do
       identifier
-      |> cast(attrs, [:type, :user])
+      |> cast(params, [:type, :user])
       |> validate_required([:type, :user])
     end
   end
@@ -33,9 +35,9 @@ defmodule MatrixServerWeb.API.Login do
     embeds_one :identifier, Identifier
   end
 
-  def changeset(attrs) do
+  def changeset(params) do
     %__MODULE__{}
-    |> cast(attrs, [:type, :password, :device_id, :initial_device_display_name])
+    |> cast(params, [:type, :password, :device_id, :initial_device_display_name])
     |> cast_embed(:identifier, with: &Identifier.changeset/2, required: true)
     |> validate_required([:type, :password])
   end

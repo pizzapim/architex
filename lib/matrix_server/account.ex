@@ -1,14 +1,12 @@
 defmodule MatrixServer.Account do
   use Ecto.Schema
 
-  import MatrixServer
   import Ecto.{Changeset, Query}
 
   alias MatrixServer.{Repo, Account, Device}
   alias Ecto.Multi
 
   @max_mxid_length 255
-  @localpart_regex ~r/^([a-z0-9\._=\/])+$/
 
   @primary_key {:localpart, :string, []}
   schema "accounts" do
@@ -18,7 +16,7 @@ defmodule MatrixServer.Account do
   end
 
   def available?(localpart) when is_binary(localpart) do
-    if Regex.match?(@localpart_regex, localpart) and
+    if Regex.match?(MatrixServer.localpart_regex(), localpart) and
          String.length(localpart) <= localpart_length() do
       if Repo.one!(
            Account
@@ -40,11 +38,34 @@ defmodule MatrixServer.Account do
     |> Multi.insert(:device, fn %{account: account} ->
       device_id = Device.generate_device_id(account.localpart)
 
+      # TODO: fix device_id with UUID
       Ecto.build_assoc(account, :devices)
       |> Map.put(:device_id, device_id)
       |> Device.changeset(params)
     end)
     |> Multi.run(:device_with_access_token, &Device.insert_new_access_token/2)
+  end
+
+  def login(%{localpart: localpart, password: password} = params) do
+    fn repo ->
+      case repo.one(from a in Account, where: a.localpart == ^localpart) do
+        %Account{password_hash: hash} = account ->
+          if Bcrypt.verify_pass(password, hash) do
+            device_id = Map.get(params, :device_id, Device.generate_device_id(localpart))
+            access_token = Device.generate_access_token(localpart, device_id)
+
+            case Device.login(account, device_id, access_token, params) do
+              {:ok, device} -> device
+              {:error, _cs} -> repo.rollback(:forbidden)
+            end
+          else
+            repo.rollback(:forbidden)
+          end
+
+        nil ->
+          repo.rollback(:forbidden)
+      end
+    end
   end
 
   def by_access_token(access_token) do
@@ -60,13 +81,13 @@ defmodule MatrixServer.Account do
     |> cast(params, [:localpart, :password_hash])
     |> validate_required([:localpart, :password_hash])
     |> validate_length(:password_hash, max: 60)
-    |> validate_format(:localpart, @localpart_regex)
+    |> validate_format(:localpart, MatrixServer.localpart_regex())
     |> validate_length(:localpart, max: localpart_length())
     |> unique_constraint(:localpart, name: :accounts_pkey)
   end
 
   defp localpart_length do
     # Subtract the "@" and ":" in the MXID.
-    @max_mxid_length - 2 - String.length(server_name())
+    @max_mxid_length - 2 - String.length(MatrixServer.server_name())
   end
 end

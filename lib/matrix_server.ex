@@ -1,35 +1,4 @@
 defmodule MatrixServer do
-  import Ecto.Changeset
-  alias Ecto.Changeset
-
-  def convert_change(changeset, old_name, new_name) do
-    convert_change(changeset, old_name, new_name, &Function.identity/1)
-  end
-
-  def convert_change(changeset, old_name, new_name, f) do
-    case changeset do
-      %Changeset{valid?: true, changes: changes} ->
-        case Map.fetch(changes, old_name) do
-          {:ok, value} ->
-            changeset
-            |> put_change(new_name, f.(value))
-            |> delete_change(old_name)
-
-          :error ->
-            changeset
-        end
-
-      _ ->
-        changeset
-    end
-  end
-
-  def validate_api_schema(params, {types, allowed, required}) do
-    {%{}, types}
-    |> cast(params, allowed)
-    |> validate_required(required)
-  end
-
   def get_mxid(localpart) when is_binary(localpart) do
     "@#{localpart}:#{server_name()}"
   end
@@ -38,11 +7,11 @@ defmodule MatrixServer do
     Application.get_env(:matrix_server, :server_name)
   end
 
-  def update_map_entry(map, old_key, new_key) do
-    update_map_entry(map, old_key, new_key, &Function.identity/1)
+  def maybe_update_map(map, old_key, new_key) do
+    maybe_update_map(map, old_key, new_key, &Function.identity/1)
   end
 
-  def update_map_entry(map, old_key, new_key, fun) when is_map_key(map, old_key) do
+  def maybe_update_map(map, old_key, new_key, fun) when is_map_key(map, old_key) do
     value = Map.fetch!(map, old_key)
 
     map
@@ -50,5 +19,12 @@ defmodule MatrixServer do
     |> Map.delete(old_key)
   end
 
-  def update_map_entry(map, _, _, _), do: map
+  def maybe_update_map(map, _, _, _), do: map
+
+  def localpart_regex, do: ~r/^([a-z0-9\._=\/])+$/
+
+  @alphabet Enum.into(?a..?z, []) ++ Enum.into(?A..?Z, [])
+  def random_string(length) when length >= 1 do
+    for _ <- 1..length, into: "", do: <<Enum.random(@alphabet)>>
+  end
 end

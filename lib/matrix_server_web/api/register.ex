@@ -2,7 +2,6 @@ defmodule MatrixServerWeb.API.Register do
   use Ecto.Schema
 
   import Ecto.Changeset
-  import MatrixServerWeb.Plug.Error
 
   alias Ecto.Changeset
 
@@ -27,12 +26,8 @@ defmodule MatrixServerWeb.API.Register do
     |> validate_required([:password, :username])
   end
 
-  def handle_error(conn, cs) do
-    put_error(conn, get_register_error(cs))
-  end
-
-  defp get_register_error(%Changeset{errors: [error | _]}), do: get_register_error(error)
-  defp get_register_error({:localpart, {_, [{:constraint, :unique} | _]}}), do: :user_in_use
-  defp get_register_error({:localpart, {_, [{:validation, _} | _]}}), do: :invalid_username
-  defp get_register_error(_), do: :bad_json
+  def get_error(%Changeset{errors: [error | _]}), do: get_error(error)
+  def get_error({:localpart, {_, [{:constraint, :unique} | _]}}), do: :user_in_use
+  def get_error({:localpart, {_, [{:validation, _} | _]}}), do: :invalid_username
+  def get_error(_), do: :bad_json
 end

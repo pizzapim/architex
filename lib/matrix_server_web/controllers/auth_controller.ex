@@ -1,12 +1,10 @@
 defmodule MatrixServerWeb.AuthController do
   use MatrixServerWeb, :controller
 
-  import MatrixServer
   import MatrixServerWeb.Plug.Error
-  import Ecto.Changeset, only: [apply_changes: 1]
-  import Ecto.Query
+  import Ecto.Changeset
 
-  alias MatrixServer.{Repo, Account, Device}
+  alias MatrixServer.{Repo, Account}
   alias MatrixServerWeb.API.{Register, Login}
   alias Ecto.Changeset
 
@@ -19,13 +17,13 @@ defmodule MatrixServerWeb.AuthController do
         input =
           apply_changes(cs)
           |> Map.from_struct()
-          |> update_map_entry(:initial_device_display_name, :display_name)
-          |> update_map_entry(:username, :localpart)
-          |> update_map_entry(:password, :password_hash, &Bcrypt.hash_pwd_salt/1)
+          |> MatrixServer.maybe_update_map(:initial_device_display_name, :display_name)
+          |> MatrixServer.maybe_update_map(:username, :localpart)
+          |> MatrixServer.maybe_update_map(:password, :password_hash, &Bcrypt.hash_pwd_salt/1)
 
         case Account.register(input) |> Repo.transaction() do
           {:ok, %{device_with_access_token: device}} ->
-            data = %{user_id: get_mxid(device.localpart)}
+            data = %{user_id: MatrixServer.get_mxid(device.localpart)}
 
             data =
               if not input.inhibit_login do
@@ -41,7 +39,8 @@ defmodule MatrixServerWeb.AuthController do
             |> json(data)
 
           {:error, _, cs, _} ->
-            Register.handle_error(conn, cs)
+            IO.inspect(cs)
+            put_error(conn, Register.get_error(cs))
         end
 
       _ ->
@@ -83,8 +82,8 @@ defmodule MatrixServerWeb.AuthController do
         input =
           apply_changes(cs)
           |> Map.from_struct()
-          |> update_map_entry(:initial_device_display_name, :display_name)
-          |> update_map_entry(:identifier, :localpart, fn
+          |> MatrixServer.maybe_update_map(:initial_device_display_name, :display_name)
+          |> MatrixServer.maybe_update_map(:identifier, :localpart, fn
             %{user: "@" <> rest} ->
               case String.split(rest) do
                 [localpart, _] -> localpart
@@ -96,10 +95,10 @@ defmodule MatrixServerWeb.AuthController do
               user
           end)
 
-        case Repo.transaction(login_transaction(input)) do
+        case Account.login(input) |> Repo.transaction() do
           {:ok, device} ->
             data = %{
-              user_id: get_mxid(device.localpart),
+              user_id: MatrixServer.get_mxid(device.localpart),
               access_token: device.access_token,
               device_id: device.device_id
             }
@@ -120,27 +119,5 @@ defmodule MatrixServerWeb.AuthController do
   def login(conn, _params) do
     # Other login types and identifiers are unsupported for now.
     put_error(conn, :unknown)
-  end
-
-  defp login_transaction(%{localpart: localpart, password: password} = params) do
-    fn repo ->
-      case repo.one(from a in Account, where: a.localpart == ^localpart) do
-        %Account{password_hash: hash} = account ->
-          if Bcrypt.verify_pass(password, hash) do
-            device_id = Map.get(params, :device_id, Device.generate_device_id(localpart))
-            access_token = Device.generate_access_token(localpart, device_id)
-
-            case Device.login(account, device_id, access_token, params) do
-              {:ok, device} -> device
-              {:error, _cs} -> repo.rollback(:forbidden)
-            end
-          else
-            repo.rollback(:forbidden)
-          end
-
-        nil ->
-          repo.rollback(:forbidden)
-      end
-    end
   end
 end

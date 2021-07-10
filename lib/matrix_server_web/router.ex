@@ -32,6 +32,7 @@ defmodule MatrixServerWeb.Router do
       get "/account/whoami", AccountController, :whoami
       post "/logout", AccountController, :logout
       post "/logout/all", AccountController, :logout_all
+      post "/createRoom", RoomController, :create
     end
   end
 
