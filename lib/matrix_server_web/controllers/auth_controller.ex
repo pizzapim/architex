@@ -14,6 +14,7 @@ defmodule MatrixServerWeb.AuthController do
   def register(conn, %{"auth" => %{"type" => @register_type}} = params) do
     case Register.changeset(params) do
       %Changeset{valid?: true} = cs ->
+        # TODO: refactor this
         input =
           apply_changes(cs)
           |> Map.from_struct()

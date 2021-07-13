@@ -6,8 +6,8 @@ use Mix.Config
 # to provide built-in test partitioning in CI environment.
 # Run `mix help test` for more information.
 config :matrix_server, MatrixServer.Repo,
-  username: "postgres",
-  password: "postgres",
+  username: "matrix_server",
+  password: "matrix_server",
   database: "matrix_server_test#{System.get_env("MIX_TEST_PARTITION")}",
   hostname: "localhost",
   pool: Ecto.Adapters.SQL.Sandbox
@@ -20,3 +20,5 @@ config :matrix_server, MatrixServerWeb.Endpoint,
 
 # Print only warnings and errors during test
 config :logger, level: :warn
+
+config :matrix_server, :server_name, "localhost"

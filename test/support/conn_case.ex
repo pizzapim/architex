@@ -40,4 +40,12 @@ defmodule MatrixServerWeb.ConnCase do
 
     {:ok, conn: Phoenix.ConnTest.build_conn()}
   end
+
+  defmacro post_json(conn, path, params) do
+    quote do
+      unquote(conn)
+      |> put_req_header("content-type", "application/json")
+      |> post(unquote(path), Jason.encode!(unquote(params)))
+    end
+  end
 end

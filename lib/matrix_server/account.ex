@@ -38,9 +38,13 @@ defmodule MatrixServer.Account do
     |> Multi.insert(:device, fn %{account: account} ->
       device_id = Device.generate_device_id(account.localpart)
 
-      # TODO: fix device_id with UUID
+      params =
+        Map.update(params, :device_id, device_id, fn
+          nil -> device_id
+          x -> x
+        end)
+
       Ecto.build_assoc(account, :devices)
-      |> Map.put(:device_id, device_id)
       |> Device.changeset(params)
     end)
     |> Multi.run(:device_with_access_token, &Device.insert_new_access_token/2)

@@ -40,6 +40,7 @@ defmodule MatrixServer.Device do
   end
 
   def generate_device_id(localpart) do
+    # TODO: use random string instead
     time_string =
       DateTime.utc_now()
       |> DateTime.to_unix()

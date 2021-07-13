@@ -15,7 +15,7 @@ defmodule MatrixServerWeb.Router do
   scope "/_matrix", MatrixServerWeb do
     pipe_through :public
 
-    scope "/client/r0", as: :client do
+    scope "/client/r0" do
       post "/register", AuthController, :register
       get "/register/available", AccountController, :available
       get "/login", AuthController, :login_types
@@ -28,7 +28,7 @@ defmodule MatrixServerWeb.Router do
   scope "/_matrix", MatrixServerWeb do
     pipe_through :authenticated
 
-    scope "/client/r0", as: :client do
+    scope "/client/r0" do
       get "/account/whoami", AccountController, :whoami
       post "/logout", AccountController, :logout
       post "/logout/all", AccountController, :logout_all
