@@ -73,23 +73,13 @@ defmodule MatrixServerWeb.AuthController do
       ) do
     case Login.changeset(params) do
       %Changeset{valid?: true} = cs ->
-        input =
-          apply_changes(cs)
-          |> Map.from_struct()
-          |> MatrixServer.maybe_update_map(:initial_device_display_name, :display_name)
-          |> MatrixServer.maybe_update_map(:identifier, :localpart, fn
-            %{user: "@" <> rest} ->
-              case String.split(rest) do
-                [localpart, _] -> localpart
-                # Empty string will never match in the database.
-                _ -> ""
-              end
+        api = apply_changes(cs)
+        # input =
+        #   apply_changes(cs)
+        #   |> Map.from_struct()
+        #   |> MatrixServer.maybe_update_map(:initial_device_display_name, :display_name)
 
-            %{user: user} ->
-              user
-          end)
-
-        case Account.login(input) |> Repo.transaction() do
+        case Account.login(api) |> Repo.transaction() do
           {:ok, device} ->
             data = %{
               user_id: MatrixServer.get_mxid(device.localpart),

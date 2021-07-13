@@ -4,7 +4,7 @@ defmodule MatrixServer.Account do
   import Ecto.{Changeset, Query}
 
   alias MatrixServer.{Repo, Account, Device}
-  alias MatrixServerWeb.API.Register
+  alias MatrixServerWeb.API.{Register, Login}
   alias Ecto.Multi
 
   @max_mxid_length 255
@@ -53,17 +53,20 @@ defmodule MatrixServer.Account do
     |> Multi.run(:device_with_access_token, &Device.insert_new_access_token/2)
   end
 
-  def login(%{localpart: localpart, password: password} = params) do
+  def login(%Login{} = api) do
+    localpart = try_get_localpart(api.identifier.user)
+
     fn repo ->
       case repo.one(from a in Account, where: a.localpart == ^localpart) do
         %Account{password_hash: hash} = account ->
-          if Bcrypt.verify_pass(password, hash) do
-            device_id = Map.get(params, :device_id, Device.generate_device_id(localpart))
-            access_token = Device.generate_access_token(localpart, device_id)
+          if Bcrypt.verify_pass(api.password, hash) do
+            case Device.login(api, account) do
+              {:ok, device} ->
+                device
 
-            case Device.login(account, device_id, access_token, params) do
-              {:ok, device} -> device
-              {:error, _cs} -> repo.rollback(:forbidden)
+              {:error, _cs} ->
+                IO.inspect(_cs)
+                repo.rollback(:forbidden)
             end
           else
             repo.rollback(:forbidden)
@@ -97,4 +100,13 @@ defmodule MatrixServer.Account do
     # Subtract the "@" and ":" in the MXID.
     @max_mxid_length - 2 - String.length(MatrixServer.server_name())
   end
+
+  defp try_get_localpart("@" <> rest = user_id) do
+    case String.split(rest, ":") do
+      [localpart, _] -> localpart
+      _ -> user_id
+    end
+  end
+
+  defp try_get_localpart(localpart), do: localpart
 end
