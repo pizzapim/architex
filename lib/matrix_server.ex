@@ -24,7 +24,9 @@ defmodule MatrixServer do
   def localpart_regex, do: ~r/^([a-z0-9\._=\/])+$/
 
   @alphabet Enum.into(?a..?z, []) ++ Enum.into(?A..?Z, [])
-  def random_string(length) when length >= 1 do
-    for _ <- 1..length, into: "", do: <<Enum.random(@alphabet)>>
+  def random_string(length), do: random_string(length, @alphabet)
+
+  def random_string(length, alphabet) when length >= 1 do
+    for _ <- 1..length, into: "", do: <<Enum.random(alphabet)>>
   end
 end

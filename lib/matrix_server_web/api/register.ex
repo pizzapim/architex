@@ -23,7 +23,7 @@ defmodule MatrixServerWeb.API.Register do
       :username,
       :inhibit_login
     ])
-    |> validate_required([:password, :username])
+    |> validate_required([:password])
   end
 
   def get_error(%Changeset{errors: [error | _]}), do: get_error(error)

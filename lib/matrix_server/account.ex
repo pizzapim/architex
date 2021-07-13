@@ -4,6 +4,7 @@ defmodule MatrixServer.Account do
   import Ecto.{Changeset, Query}
 
   alias MatrixServer.{Repo, Account, Device}
+  alias MatrixServerWeb.API.Register
   alias Ecto.Multi
 
   @max_mxid_length 255
@@ -32,20 +33,22 @@ defmodule MatrixServer.Account do
     end
   end
 
-  def register(params) do
-    Multi.new()
-    |> Multi.insert(:account, changeset(%Account{}, params))
-    |> Multi.insert(:device, fn %{account: account} ->
-      device_id = Device.generate_device_id(account.localpart)
+  def register(%Register{} = api) do
+    account_params = %{
+      localpart: api.username || MatrixServer.random_string(10, ?a..?z),
+      password_hash: Bcrypt.hash_pwd_salt(api.password)
+    }
 
-      params =
-        Map.update(params, :device_id, device_id, fn
-          nil -> device_id
-          x -> x
-        end)
+    Multi.new()
+    |> Multi.insert(:account, changeset(%Account{}, account_params))
+    |> Multi.insert(:device, fn %{account: account} ->
+      device_params = %{
+        display_name: api.initial_device_display_name,
+        device_id: api.device_id || Device.generate_device_id(account.localpart)
+      }
 
       Ecto.build_assoc(account, :devices)
-      |> Device.changeset(params)
+      |> Device.changeset(device_params)
     end)
     |> Multi.run(:device_with_access_token, &Device.insert_new_access_token/2)
   end

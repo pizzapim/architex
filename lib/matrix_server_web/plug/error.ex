@@ -4,7 +4,7 @@ defmodule MatrixServerWeb.Plug.Error do
 
   @error_code_and_message %{
     bad_json: {400, "M_BAD_JSON", "Bad request."},
-    user_in_use: {400, "M_USE_IN_USE", "Username is already taken."},
+    user_in_use: {400, "M_USER_IN_USE", "Username is already taken."},
     invalid_username: {400, "M_INVALID_USERNAME", "Invalid username."},
     forbidden: {400, "M_FORBIDDEN", "The requested action is forbidden."},
     unrecognized: {400, "M_UNRECOGNIZED", "Unrecognized request."},
