@@ -42,8 +42,8 @@ defmodule MatrixServer.Event do
       | type: "m.room.create",
         state_key: "",
         content: %{
-          creator: creator,
-          room_version: room_version || MatrixServer.default_room_version()
+          "creator" => creator,
+          "room_version" => room_version || MatrixServer.default_room_version()
         }
     }
   end
@@ -54,51 +54,117 @@ defmodule MatrixServer.Event do
       | type: "m.room.member",
         state_key: sender,
         content: %{
-          membership: "invite"
+          "membership" => "invite"
         }
     }
   end
 
-  def room_creation_create_room(%CreateRoom{room_version: room_version}, %Account{
-        localpart: localpart
+  def power_levels(room_id, sender) do
+    %Event{
+      new(room_id, sender)
+      | type: "m.room.power_levels",
+        state_key: "",
+        content: %{
+          "ban" => 50,
+          "events" => %{},
+          "events_default" => 0,
+          "invite" => 50,
+          "kick" => 50,
+          "redact" => 50,
+          "state_default" => 50,
+          "users" => %{
+            sender => 50
+          },
+          "users_default" => 0,
+          "notifications" => %{
+            "room" => 50
+          }
+        }
+    }
+  end
+
+  def room_name(room_id, sender, name) do
+    %Event{
+      new(room_id, sender)
+      | type: "m.room.name",
+        state_key: "",
+        content: %{
+          "name" => name
+        }
+    }
+  end
+
+  def room_topic(room_id, sender, topic) do
+    %Event{
+      new(room_id, sender)
+      | type: "m.room.topic",
+        state_key: "",
+        content: %{
+          "topic" => topic
+        }
+    }
+  end
+
+  def room_creation_create_room(repo, %{
+        input: %CreateRoom{room_version: room_version},
+        account: %Account{localpart: localpart},
+        room: %Room{id: room_id}
       }) do
-    fn repo, %{room: %Room{id: room_id}} ->
-      # TODO: state resolution
-      create_room(room_id, MatrixServer.get_mxid(localpart), room_version)
-      |> repo.insert()
-    end
+    # TODO: state resolution
+    create_room(room_id, MatrixServer.get_mxid(localpart), room_version)
+    |> repo.insert()
   end
 
-  def room_creation_join_creator do
-    fn repo,
-       %{
-         create_room_event: %Event{sender: creator, event_id: create_room_event_id},
-         room: %Room{id: room_id}
-       } ->
-      # TODO: state resolution
-      join(room_id, creator)
-      |> Map.put(:prev_events, [create_room_event_id])
-      |> Map.put(:auth_events, [create_room_event_id])
-      |> repo.insert()
-    end
+  def room_creation_join_creator(repo, %{
+        room: %Room{id: room_id},
+        create_room_event: %Event{sender: creator}
+      }) do
+    # TODO: state resolution
+    join(room_id, creator)
+    |> repo.insert()
   end
 
-  def room_creation_power_levels(_input) do
-    fn _repo, %{} ->
-      {:ok, :ok}
-    end
+  def room_creation_power_levels(
+        repo,
+        %{
+          room: %Room{id: room_id},
+          create_room_event: %Event{sender: creator}
+        }
+      ) do
+    # TODO: state resolution
+    power_levels(room_id, creator)
+    |> repo.insert()
   end
 
-  def room_creation_name(_input) do
-    fn _repo, %{} ->
-      {:ok, :ok}
-    end
+  def room_creation_name(_repo, %{input: %CreateRoom{name: nil}}), do: {:ok, :noop}
+
+  def room_creation_name(
+        repo,
+        %{
+          input: %CreateRoom{name: name},
+          room: %Room{id: room_id},
+          create_room_event: %Event{sender: creator}
+        }
+      ) do
+    # TODO: state resolution
+    # TODO: check name length
+    room_name(room_id, creator, name)
+    |> repo.insert()
   end
 
-  def room_creation_topic(_input) do
-    fn _repo, %{} ->
-      {:ok, :ok}
-    end
+  def room_creation_topic(_repo, %{input: %CreateRoom{topic: nil}}), do: {:ok, :noop}
+
+  def room_creation_topic(
+        repo,
+        %{
+          input: %CreateRoom{topic: topic},
+          room: %Room{id: room_id},
+          create_room_event: %Event{sender: creator}
+        }
+      ) do
+    # TODO: state resolution
+    room_topic(room_id, creator, topic)
+    |> repo.insert()
   end
 
   def generate_event_id do

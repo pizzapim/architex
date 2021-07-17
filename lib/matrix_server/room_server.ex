@@ -23,12 +23,14 @@ defmodule MatrixServer.RoomServer do
     # TODO: preset events, initial_state events, invite, invite_3pid
     result =
       Multi.new()
+      |> Multi.put(:input, input)
+      |> Multi.put(:account, account)
       |> Multi.insert(:room, Room.create_changeset(input))
-      |> Multi.run(:create_room_event, Event.room_creation_create_room(input, account))
-      |> Multi.run(:join_creator_event, Event.room_creation_join_creator())
-      |> Multi.run(:power_levels_event, Event.room_creation_power_levels(input))
-      |> Multi.run(:name_event, Event.room_creation_name(input))
-      |> Multi.run(:topic_event, Event.room_creation_topic(input))
+      |> Multi.run(:create_room_event, &Event.room_creation_create_room/2)
+      |> Multi.run(:join_creator_event, &Event.room_creation_join_creator/2)
+      |> Multi.run(:power_levels_event, &Event.room_creation_power_levels/2)
+      |> Multi.run(:name_event, &Event.room_creation_name/2)
+      |> Multi.run(:topic_event, &Event.room_creation_topic/2)
       |> Repo.transaction()
 
     {:reply, result, state}
