@@ -14,14 +14,14 @@ defmodule MatrixServerWeb.AuthController do
   def register(conn, %{"auth" => %{"type" => @register_type}} = params) do
     case Register.changeset(params) do
       %Changeset{valid?: true} = cs ->
-        api = apply_changes(cs)
+        input = apply_changes(cs)
 
-        case Account.register(api) |> Repo.transaction() do
+        case Account.register(input) |> Repo.transaction() do
           {:ok, %{device_with_access_token: device}} ->
             data = %{user_id: MatrixServer.get_mxid(device.localpart)}
 
             data =
-              if not api.inhibit_login do
+              if not input.inhibit_login do
                 data
                 |> Map.put(:device_id, device.device_id)
                 |> Map.put(:access_token, device.access_token)
@@ -73,13 +73,9 @@ defmodule MatrixServerWeb.AuthController do
       ) do
     case Login.changeset(params) do
       %Changeset{valid?: true} = cs ->
-        api = apply_changes(cs)
-        # input =
-        #   apply_changes(cs)
-        #   |> Map.from_struct()
-        #   |> MatrixServer.maybe_update_map(:initial_device_display_name, :display_name)
+        input = apply_changes(cs)
 
-        case Account.login(api) |> Repo.transaction() do
+        case Account.login(input) |> Repo.transaction() do
           {:ok, device} ->
             data = %{
               user_id: MatrixServer.get_mxid(device.localpart),

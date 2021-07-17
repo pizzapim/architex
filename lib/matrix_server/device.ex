@@ -50,16 +50,16 @@ defmodule MatrixServer.Device do
     "#{localpart}_#{time_string}"
   end
 
-  def login(%Login{} = api, account) do
-    device_id = api.device_id || generate_device_id(account.localpart)
+  def login(%Login{} = input, account) do
+    device_id = input.device_id || generate_device_id(account.localpart)
     access_token = generate_access_token(account.localpart, device_id)
 
     update_query =
       from(d in Device)
       |> update(set: [access_token: ^access_token, device_id: ^device_id])
       |> then(fn q ->
-        if api.initial_device_display_name do
-          update(q, set: [display_name: ^api.initial_device_display_name])
+        if input.initial_device_display_name do
+          update(q, set: [display_name: ^input.initial_device_display_name])
         else
           q
         end
@@ -67,7 +67,7 @@ defmodule MatrixServer.Device do
 
     device_params = %{
       device_id: device_id,
-      display_name: api.initial_device_display_name
+      display_name: input.initial_device_display_name
     }
 
     Ecto.build_assoc(account, :devices)

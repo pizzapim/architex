@@ -33,18 +33,18 @@ defmodule MatrixServer.Account do
     end
   end
 
-  def register(%Register{} = api) do
+  def register(%Register{} = input) do
     account_params = %{
-      localpart: api.username || MatrixServer.random_string(10, ?a..?z),
-      password_hash: Bcrypt.hash_pwd_salt(api.password)
+      localpart: input.username || MatrixServer.random_string(10, ?a..?z),
+      password_hash: Bcrypt.hash_pwd_salt(input.password)
     }
 
     Multi.new()
     |> Multi.insert(:account, changeset(%Account{}, account_params))
     |> Multi.insert(:device, fn %{account: account} ->
       device_params = %{
-        display_name: api.initial_device_display_name,
-        device_id: api.device_id || Device.generate_device_id(account.localpart)
+        display_name: input.initial_device_display_name,
+        device_id: input.device_id || Device.generate_device_id(account.localpart)
       }
 
       Ecto.build_assoc(account, :devices)
@@ -53,14 +53,14 @@ defmodule MatrixServer.Account do
     |> Multi.run(:device_with_access_token, &Device.insert_new_access_token/2)
   end
 
-  def login(%Login{} = api) do
-    localpart = try_get_localpart(api.identifier.user)
+  def login(%Login{} = input) do
+    localpart = try_get_localpart(input.identifier.user)
 
     fn repo ->
       case repo.one(from a in Account, where: a.localpart == ^localpart) do
         %Account{password_hash: hash} = account ->
-          if Bcrypt.verify_pass(api.password, hash) do
-            case Device.login(api, account) do
+          if Bcrypt.verify_pass(input.password, hash) do
+            case Device.login(input, account) do
               {:ok, device} ->
                 device
 
@@ -87,6 +87,7 @@ defmodule MatrixServer.Account do
   end
 
   def changeset(account, params \\ %{}) do
+    # TODO: fix password_hash in params
     account
     |> cast(params, [:localpart, :password_hash])
     |> validate_required([:localpart, :password_hash])

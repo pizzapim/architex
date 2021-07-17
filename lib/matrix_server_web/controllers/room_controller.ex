@@ -6,13 +6,14 @@ defmodule MatrixServerWeb.RoomController do
 
   alias MatrixServerWeb.API.{CreateRoom}
   alias Ecto.Changeset
+  alias Plug.Conn
 
-  def create(conn, params) do
+  def create(%Conn{assigns: %{account: account}} = conn, params) do
     case CreateRoom.changeset(params) do
       %Changeset{valid?: true} = cs ->
-        api_struct = apply_changes(cs)
-
-        MatrixServer.RoomServer.create_room(api_struct)
+        cs
+        |> apply_changes()
+        |> MatrixServer.RoomServer.create_room(account)
 
         conn
         |> put_status(200)

@@ -12,18 +12,19 @@ defmodule MatrixServer.Room do
     field :visibility, Ecto.Enum, values: [:public, :private]
   end
 
-  def create(%CreateRoom{} = api) do
-    Multi.new()
-    |> Multi.insert(:room, Room.create_changeset(api))
-  end
-
   def changeset(room, params \\ %{}) do
-    room
-    |> cast(params, [:visibility])
+    cast(room, params, [:visibility])
   end
 
-  def create_changeset(%CreateRoom{} = api) do
-    %Room{visibility: api.visibility, id: MatrixServer.random_string(18)}
-    |> changeset()
+  def create_changeset(%CreateRoom{} = input) do
+    visibility = input.visibility || :public
+
+    %Room{}
+    |> changeset(%{visibility: visibility})
+    |> put_change(:id, generate_room_id())
+  end
+
+  def generate_room_id do
+    "!" <> MatrixServer.random_string(18) <> "@" <> MatrixServer.server_name()
   end
 end

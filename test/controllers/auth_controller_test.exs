@@ -123,6 +123,7 @@ defmodule MatrixServerWeb.AuthControllerTest do
 
     test "handles wrong password", %{conn: conn} do
       Factory.insert(:account, localpart: "sneed", password_hash: Bcrypt.hash_pwd_salt("surprise"))
+
       conn = post_json(conn, Routes.auth_path(Endpoint, :login), @basic_params)
 
       assert %{"errcode" => "M_FORBIDDEN"} = json_response(conn, 400)

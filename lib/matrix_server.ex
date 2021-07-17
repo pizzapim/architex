@@ -29,4 +29,6 @@ defmodule MatrixServer do
   def random_string(length, alphabet) when length >= 1 do
     for _ <- 1..length, into: "", do: <<Enum.random(alphabet)>>
   end
+
+  def default_room_version, do: "7"
 end
