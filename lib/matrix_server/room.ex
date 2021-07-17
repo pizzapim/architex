@@ -5,7 +5,6 @@ defmodule MatrixServer.Room do
 
   alias __MODULE__
   alias MatrixServerWeb.API.CreateRoom
-  alias Ecto.Multi
 
   @primary_key {:id, :string, []}
   schema "rooms" do

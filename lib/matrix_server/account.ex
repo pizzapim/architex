@@ -65,7 +65,6 @@ defmodule MatrixServer.Account do
                 device
 
               {:error, _cs} ->
-                IO.inspect(_cs)
                 repo.rollback(:forbidden)
             end
           else
