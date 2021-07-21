@@ -31,6 +31,9 @@ defmodule MatrixServer.RoomServer do
       |> Multi.run(:power_levels_event, &Event.room_creation_power_levels/2)
       |> Multi.run(:name_event, &Event.room_creation_name/2)
       |> Multi.run(:topic_event, &Event.room_creation_topic/2)
+      |> Multi.run(:temp, fn _, _ ->
+        {:error, :lol}
+      end)
       |> Repo.transaction()
 
     {:reply, result, state}
