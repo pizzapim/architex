@@ -54,7 +54,7 @@ defmodule MatrixServer.Event do
       | type: "m.room.member",
         state_key: sender,
         content: %{
-          "membership" => "invite"
+          "membership" => "join"
         }
     }
   end
@@ -111,9 +111,10 @@ defmodule MatrixServer.Event do
         room: %Room{id: room_id}
       }) do
     # TODO: state resolution
-    create_room_event = create_room(room_id, MatrixServer.get_mxid(localpart), room_version)
-    resolve([events_to_state_set([create_room_event])])
-    repo.insert(create_room_event)
+    create_room(room_id, MatrixServer.get_mxid(localpart), room_version)
+    # resolve([events_to_state_set([create_room_event])])
+    # MatrixServer.StateResolution.resolve(create_room_event)
+    # repo.insert(create_room_event)
   end
 
   def room_creation_join_creator(repo, %{
@@ -244,16 +245,18 @@ defmodule MatrixServer.Event do
         MapSet.size(events) == 1
       end)
 
-    unconflicted_state_map = Enum.into(unconflicted, %{}, fn {state_pair, events} ->
-      event = MapSet.to_list(events) |> hd()
+    unconflicted_state_map =
+      Enum.into(unconflicted, %{}, fn {state_pair, events} ->
+        event = MapSet.to_list(events) |> hd()
 
-      {state_pair, event}
-    end)
+        {state_pair, event}
+      end)
 
-    conflicted_state_set = Enum.reduce(conflicted, MapSet.new(), fn {_, events}, acc ->
-      MapSet.union(acc, events)
-    end)
-    |> MapSet.delete(nil)
+    conflicted_state_set =
+      Enum.reduce(conflicted, MapSet.new(), fn {_, events}, acc ->
+        MapSet.union(acc, events)
+      end)
+      |> MapSet.delete(nil)
 
     {unconflicted_state_map, conflicted_state_set}
   end

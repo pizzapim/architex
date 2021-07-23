@@ -3,12 +3,13 @@ defmodule MatrixServer.Room do
 
   import Ecto.Changeset
 
-  alias __MODULE__
+  alias MatrixServer.{Room, Event}
   alias MatrixServerWeb.API.CreateRoom
 
   @primary_key {:id, :string, []}
   schema "rooms" do
     field :visibility, Ecto.Enum, values: [:public, :private]
+    has_many :events, Event, foreign_key: :event_id
   end
 
   def changeset(room, params \\ %{}) do

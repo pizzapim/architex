@@ -11,15 +11,11 @@ defmodule MatrixServer.Application do
       MatrixServerWeb.Telemetry,
       {Phoenix.PubSub, name: MatrixServer.PubSub},
       MatrixServerWeb.Endpoint,
-      MatrixServer.RoomServer
-      # Start a worker by calling: MatrixServer.Worker.start_link(arg)
-      # {MatrixServer.Worker, arg}
+      {Registry, keys: :unique, name: MatrixServer.RoomServer.Registry},
+      {DynamicSupervisor, name: MatrixServer.RoomServer.Supervisor, strategy: :one_for_one}
     ]
 
-    # See https://hexdocs.pm/elixir/Supervisor.html
-    # for other strategies and supported options
-    opts = [strategy: :one_for_one, name: MatrixServer.Supervisor]
-    Supervisor.start_link(children, opts)
+    Supervisor.start_link(children, name: MatrixServer.Supervisor, strategy: :one_for_one)
   end
 
   # Tell Phoenix to update the endpoint configuration
