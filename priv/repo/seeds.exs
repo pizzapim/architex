@@ -1,4 +1,15 @@
-alias MatrixServer.{Repo, Room, Event}
+alias MatrixServer.{Repo, Room, Event, Account, Device}
+
+Repo.insert!(%Account{
+  localpart: "chuck",
+  password_hash: Bcrypt.hash_pwd_salt("sneed")
+})
+
+Repo.insert(%Device{
+  device_id: "android",
+  display_name: "My Android",
+  localpart: "chuck"
+})
 
 # Auth difference example from here:
 # https://matrix.org/docs/guides/implementing-stateres#auth-differences

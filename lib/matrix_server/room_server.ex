@@ -3,25 +3,9 @@ defmodule MatrixServer.RoomServer do
 
   alias MatrixServer.{Repo, Room, Event, Account}
   alias MatrixServerWeb.API.CreateRoom
-  alias Ecto.Multi
 
   @registry MatrixServer.RoomServer.Registry
   @supervisor MatrixServer.RoomServer.Supervisor
-
-  def get_room_server(room_id) do
-    case Registry.lookup(@registry, room_id) do
-      [{pid, _}] ->
-        {:ok, pid}
-
-      [] ->
-        opts = [
-          room_id: room_id,
-          name: {:via, Registry, {@registry, room_id}}
-        ]
-
-        DynamicSupervisor.start_child(@supervisor, {__MODULE__, opts})
-    end
-  end
 
   def start_link(opts) do
     {name, opts} = Keyword.pop(opts, :name)
@@ -29,19 +13,16 @@ defmodule MatrixServer.RoomServer do
   end
 
   def create_room(input, account) do
-    Multi.new()
-    |> Multi.insert(:room, Room.create_changeset(input))
-    |> Multi.run(:room_server, fn _repo, %{room: %Room{id: room_id} = room} ->
-      opts = [
-        name: {:via, Registry, {@registry, room_id}},
-        input: input,
-        account: account,
-        room: room
-      ]
+    %Room{id: room_id} = room = Repo.insert!(Room.create_changeset(input))
 
-      DynamicSupervisor.start_child(@supervisor, {__MODULE__, opts})
-    end)
-    |> Repo.transaction()
+    opts = [
+      name: {:via, Registry, {@registry, room_id}},
+      input: input,
+      account: account,
+      room: room
+    ]
+
+    DynamicSupervisor.start_child(@supervisor, {__MODULE__, opts})
   end
 
   @impl true
@@ -50,27 +31,23 @@ defmodule MatrixServer.RoomServer do
     input = Keyword.fetch!(opts, :input)
     account = Keyword.fetch!(opts, :account)
 
-    state = %{
-      room_id: room_id,
-      state_set: %{}
-    }
-
     Repo.transaction(fn ->
-      with {:ok, create_room_event} <- insert_create_room_event(account, input, state) do
-        {:ok, state}
+      with {:ok, state_set} <- insert_create_room_event(account, input, room_id) do
+        {:ok, %{room_id: room_id, state_set: state_set}}
       end
     end)
-
-    {:ok, state}
   end
 
   defp insert_create_room_event(
          %Account{localpart: localpart},
          %CreateRoom{room_version: room_version},
-         %{room_id: room_id, state_set: state_set}
+         room_id
        ) do
-    create_room_event = Event.create_room(room_id, MatrixServer.get_mxid(localpart), room_version)
-    MatrixServer.StateResolution.resolve(create_room_event)
-    {:ok, create_room_event}
+    state_set =
+      Event.create_room(room_id, MatrixServer.get_mxid(localpart), room_version)
+      |> Repo.insert!()
+      |> MatrixServer.StateResolution.resolve(true)
+
+    {:ok, state_set}
   end
 end

@@ -3,8 +3,7 @@ defmodule MatrixServer.Event do
 
   import Ecto.Changeset
 
-  alias MatrixServer.{Room, Event, Account}
-  alias MatrixServerWeb.API.CreateRoom
+  alias MatrixServer.{Room, Event}
 
   @primary_key {:event_id, :string, []}
   schema "events" do
@@ -19,7 +18,6 @@ defmodule MatrixServer.Event do
   end
 
   def changeset(event, params \\ %{}) do
-    # TODO: prev/auth events?
     event
     |> cast(params, [:type, :timestamp, :state_key, :sender, :content])
     |> validate_required([:type, :timestamp, :sender])
@@ -105,159 +103,7 @@ defmodule MatrixServer.Event do
     }
   end
 
-  def room_creation_create_room(repo, %{
-        input: %CreateRoom{room_version: room_version},
-        account: %Account{localpart: localpart},
-        room: %Room{id: room_id}
-      }) do
-    # TODO: state resolution
-    create_room(room_id, MatrixServer.get_mxid(localpart), room_version)
-    # resolve([events_to_state_set([create_room_event])])
-    # MatrixServer.StateResolution.resolve(create_room_event)
-    # repo.insert(create_room_event)
-  end
-
-  def room_creation_join_creator(repo, %{
-        room: %Room{id: room_id},
-        create_room_event: %Event{sender: creator, event_id: create_room_id}
-      }) do
-    # TODO: state resolution
-    join(room_id, creator)
-    |> Map.put(:prev_events, [create_room_id])
-    |> Map.put(:auth_events, [create_room_id])
-    |> repo.insert()
-  end
-
-  def room_creation_power_levels(
-        repo,
-        %{
-          room: %Room{id: room_id},
-          create_room_event: %Event{sender: creator, event_id: create_room_id},
-          join_creator_event: %Event{event_id: join_creator_id}
-        }
-      ) do
-    # TODO: state resolution
-    power_levels(room_id, creator)
-    |> Map.put(:prev_events, [join_creator_id])
-    |> Map.put(:auth_events, [create_room_id, join_creator_id])
-    |> repo.insert()
-  end
-
-  def room_creation_name(_repo, %{input: %CreateRoom{name: nil}}), do: {:ok, nil}
-
-  def room_creation_name(_repo, %{input: %CreateRoom{name: name}}) when byte_size(name) > 255,
-    do: {:error, :name}
-
-  def room_creation_name(
-        repo,
-        %{
-          input: %CreateRoom{name: name},
-          room: %Room{id: room_id},
-          create_room_event: %Event{sender: creator, event_id: create_room_id},
-          join_creator_event: %Event{event_id: join_creator_id},
-          power_levels_event: %Event{event_id: power_levels_id}
-        }
-      ) do
-    # TODO: state resolution
-    room_name(room_id, creator, name)
-    |> Map.put(:prev_events, [power_levels_id])
-    |> Map.put(:auth_events, [create_room_id, join_creator_id, power_levels_id])
-    |> repo.insert()
-  end
-
-  def room_creation_topic(_repo, %{input: %CreateRoom{topic: nil}}), do: {:ok, nil}
-
-  def room_creation_topic(
-        repo,
-        %{
-          input: %CreateRoom{topic: topic},
-          room: %Room{id: room_id},
-          create_room_event: %Event{sender: creator, event_id: create_room_id},
-          join_creator_event: %Event{event_id: join_creator_id},
-          power_levels_event: %Event{event_id: power_levels_id},
-          name_event: name_event
-        }
-      ) do
-    # TODO: state resolution
-    prev_event = if name_event, do: name_event.event_id, else: power_levels_id
-
-    room_topic(room_id, creator, topic)
-    |> Map.put(:prev_events, [prev_event])
-    |> Map.put(:auth_events, [create_room_id, join_creator_id, power_levels_id])
-    |> repo.insert()
-  end
-
   def generate_event_id do
     "$" <> MatrixServer.random_string(17) <> ":" <> MatrixServer.server_name()
-  end
-
-  def events_to_state_set(events) do
-    Enum.into(events, %{}, fn %Event{type: type, state_key: state_key} = event ->
-      {{type, state_key}, event}
-    end)
-  end
-
-  def resolve(state_sets) do
-    {unconflicted_state_map, conflicted_set} = calculate_conflict(state_sets)
-    # full_conflicted_set = MapSet.union(conflicted_set, auth_difference(state_sets))
-
-    # conflicted_control_events =
-    #   Enum.filter(full_conflicted_set, &is_control_event/1) |> MapSet.new()
-
-    # conflicted_control_events_with_auth =
-    #   MapSet.union(
-    #     conflicted_control_events,
-    #     MapSet.intersection(
-    #       full_conflicted_set,
-    #       full_auth_chain(MapSet.to_list(conflicted_control_events))
-    #     )
-    #   )
-
-    # sorted_control_events = Enum.sort(conflicted_control_events_with_auth, &rev_top_pow_order/2)
-    # partial_resolved_state = iterative_auth_checks(sorted_control_events, unconflicted_state_map)
-
-    # other_conflicted_events =
-    #   MapSet.difference(full_conflicted_set, conflicted_control_events_with_auth)
-
-    # resolved_power_levels = partial_resolved_state[{:power_levels, ""}]
-
-    # sorted_other_events =
-    #   Enum.sort(other_conflicted_events, mainline_order(resolved_power_levels))
-
-    # nearly_final_state = iterative_auth_checks(sorted_other_events, partial_resolved_state)
-
-    # Map.merge(nearly_final_state, unconflicted_state_map)
-  end
-
-  def calculate_conflict(state_sets) do
-    {unconflicted, conflicted} =
-      state_sets
-      |> Enum.flat_map(&Map.keys/1)
-      |> MapSet.new()
-      |> Enum.map(fn state_pair ->
-        events =
-          Enum.map(state_sets, &Map.get(&1, state_pair))
-          |> MapSet.new()
-
-        {state_pair, events}
-      end)
-      |> Enum.split_with(fn {_k, events} ->
-        MapSet.size(events) == 1
-      end)
-
-    unconflicted_state_map =
-      Enum.into(unconflicted, %{}, fn {state_pair, events} ->
-        event = MapSet.to_list(events) |> hd()
-
-        {state_pair, event}
-      end)
-
-    conflicted_state_set =
-      Enum.reduce(conflicted, MapSet.new(), fn {_, events}, acc ->
-        MapSet.union(acc, events)
-      end)
-      |> MapSet.delete(nil)
-
-    {unconflicted_state_map, conflicted_state_set}
   end
 end

@@ -12,7 +12,7 @@ defmodule MatrixServer.StateResolution do
     |> Map.put(:auth_events, ["create", "join_charlie", "b"])
   end
 
-  def resolve(%Event{room_id: room_id} = event) do
+  def resolve(%Event{room_id: room_id} = event, apply_state \\ false) do
     room_events =
       Event
       |> where([e], e.room_id == ^room_id)
@@ -20,68 +20,72 @@ defmodule MatrixServer.StateResolution do
       |> Repo.all()
       |> Enum.into(%{})
 
-    resolve(event, room_events)
+    resolve(event, room_events, apply_state)
   end
 
   def resolve(
         %Event{type: type, state_key: state_key, event_id: event_id, prev_events: prev_event_ids},
-        room_events
+        room_events,
+        apply_state
       ) do
     state_sets =
       prev_event_ids
       |> Enum.map(&room_events[&1])
       |> Enum.map(&resolve(&1, room_events))
 
-    resolved_state = resolve(state_sets, room_events)
+    resolved_state = do_resolve(state_sets, room_events)
     # TODO: check if state event
-    Map.put(resolved_state, {type, state_key}, event_id)
+    if apply_state do
+      Map.put(resolved_state, {type, state_key}, event_id)
+    else
+      resolved_state
+    end
   end
 
-  def resolve([], _), do: %{}
+  def do_resolve([], _), do: %{}
 
-  def resolve(state_sets, room_events) do
+  def do_resolve(state_sets, room_events) do
     {unconflicted_state_map, conflicted_state_set} = calculate_conflict(state_sets)
 
     if MapSet.size(conflicted_state_set) == 0 do
       unconflicted_state_map
     else
-      full_conflicted_set =
-        MapSet.union(conflicted_state_set, auth_difference(state_sets, room_events))
-
-      conflicted_control_event_ids =
-        Enum.filter(full_conflicted_set, &is_control_event(&1, room_events)) |> MapSet.new()
-
-      conflicted_control_event_ids_with_auth =
-        conflicted_control_event_ids
-        |> MapSet.to_list()
-        |> full_auth_chain(room_events)
-        |> MapSet.intersection(full_conflicted_set)
-        |> MapSet.union(conflicted_control_event_ids)
-
-      conflicted_control_events_with_auth =
-        Enum.map(conflicted_control_event_ids_with_auth, &room_events[&1])
-
-      sorted_control_events =
-        Enum.sort(conflicted_control_events_with_auth, rev_top_pow_order(room_events))
-
-      partial_resolved_state =
-        iterative_auth_checks(sorted_control_events, unconflicted_state_map, room_events)
-
-      other_conflicted_event_ids =
-        MapSet.difference(full_conflicted_set, conflicted_control_event_ids_with_auth)
-
-      other_conflicted_events = Enum.map(other_conflicted_event_ids, &room_events[&1])
-
-      resolved_power_levels = partial_resolved_state[{"m.room.power_levels", ""}]
-
-      sorted_other_events =
-        Enum.sort(other_conflicted_events, mainline_order(resolved_power_levels, room_events))
-
-      nearly_final_state =
-        iterative_auth_checks(sorted_other_events, partial_resolved_state, room_events)
-
-      Map.merge(nearly_final_state, unconflicted_state_map)
+      do_resolve(state_sets, room_events, unconflicted_state_map, conflicted_state_set)
     end
+  end
+
+  def do_resolve(state_sets, room_events, unconflicted_state_map, conflicted_state_set) do
+    full_conflicted_set =
+      MapSet.union(conflicted_state_set, auth_difference(state_sets, room_events))
+
+    conflicted_control_event_ids =
+      full_conflicted_set
+      |> Enum.filter(&is_control_event(&1, room_events))
+      |> MapSet.new()
+
+    conflicted_control_events_with_auth_ids =
+      conflicted_control_event_ids
+      |> MapSet.to_list()
+      |> full_auth_chain(room_events)
+      |> MapSet.intersection(full_conflicted_set)
+      |> MapSet.union(conflicted_control_event_ids)
+
+    sorted_control_events =
+      conflicted_control_events_with_auth_ids
+      |> Enum.map(&room_events[&1])
+      |> Enum.sort(rev_top_pow_order(room_events))
+
+    partial_resolved_state =
+      iterative_auth_checks(sorted_control_events, unconflicted_state_map, room_events)
+
+    resolved_power_levels = partial_resolved_state[{"m.room.power_levels", ""}]
+
+    conflicted_control_events_with_auth_ids
+    |> MapSet.difference(full_conflicted_set)
+    |> Enum.map(&room_events[&1])
+    |> Enum.sort(mainline_order(resolved_power_levels, room_events))
+    |> iterative_auth_checks(partial_resolved_state, room_events)
+    |> Map.merge(unconflicted_state_map)
   end
 
   def calculate_conflict(state_sets) do
@@ -256,11 +260,14 @@ defmodule MatrixServer.StateResolution do
 
   def iterative_auth_checks(events, state_set, room_events) do
     Enum.reduce(events, state_set, fn event, acc ->
-      if is_authorized2(event, acc, room_events), do: insert_event(event, acc), else: acc
+      if is_authorized2(event, acc, room_events), do: update_state_set(event, acc), else: acc
     end)
   end
 
-  def insert_event(%Event{type: event_type, state_key: state_key, event_id: event_id}, state_set) do
+  def update_state_set(
+        %Event{type: event_type, state_key: state_key, event_id: event_id},
+        state_set
+      ) do
     Map.put(state_set, {event_type, state_key}, event_id)
   end
 
