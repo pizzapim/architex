@@ -12,58 +12,73 @@ defmodule MatrixServer.StateResolution do
     |> Map.put(:auth_events, ["create", "join_charlie", "b"])
   end
 
-  def resolve(%Event{type: type, state_key: state_key, event_id: event_id, prev_events: prev_event_ids}) do
-    state_sets = Event
-      |> where([e], e.event_id in ^prev_event_ids)
+  def resolve(%Event{room_id: room_id} = event) do
+    room_events =
+      Event
+      |> where([e], e.room_id == ^room_id)
+      |> select([e], {e.event_id, e})
       |> Repo.all()
-      |> Enum.map(&resolve/1)
-    
-    resolved_state = resolve(state_sets)
+      |> Enum.into(%{})
+
+    resolve(event, room_events)
+  end
+
+  def resolve(
+        %Event{type: type, state_key: state_key, event_id: event_id, prev_events: prev_event_ids},
+        room_events
+      ) do
+    state_sets =
+      prev_event_ids
+      |> Enum.map(&room_events[&1])
+      |> Enum.map(&resolve(&1, room_events))
+
+    resolved_state = resolve(state_sets, room_events)
     # TODO: check if state event
     Map.put(resolved_state, {type, state_key}, event_id)
   end
 
-  def resolve([]), do: %{}
+  def resolve([], _), do: %{}
 
-  def resolve(state_sets) do
+  def resolve(state_sets, room_events) do
     {unconflicted_state_map, conflicted_state_set} = calculate_conflict(state_sets)
+
     if MapSet.size(conflicted_state_set) == 0 do
       unconflicted_state_map
     else
-      full_conflicted_set = MapSet.union(conflicted_state_set, auth_difference(state_sets))
+      full_conflicted_set =
+        MapSet.union(conflicted_state_set, auth_difference(state_sets, room_events))
 
       conflicted_control_event_ids =
-        Enum.filter(full_conflicted_set, &is_control_event/1) |> MapSet.new()
+        Enum.filter(full_conflicted_set, &is_control_event(&1, room_events)) |> MapSet.new()
 
       conflicted_control_event_ids_with_auth =
         conflicted_control_event_ids
         |> MapSet.to_list()
-        |> full_auth_chain()
+        |> full_auth_chain(room_events)
         |> MapSet.intersection(full_conflicted_set)
         |> MapSet.union(conflicted_control_event_ids)
 
       conflicted_control_events_with_auth =
-        Repo.all(
-          from e in Event,
-            where: e.event_id in ^MapSet.to_list(conflicted_control_event_ids_with_auth)
-        )
+        Enum.map(conflicted_control_event_ids_with_auth, &room_events[&1])
 
-      sorted_control_events = Enum.sort(conflicted_control_events_with_auth, &rev_top_pow_order/2)
+      sorted_control_events =
+        Enum.sort(conflicted_control_events_with_auth, rev_top_pow_order(room_events))
 
-      partial_resolved_state = iterative_auth_checks(sorted_control_events, unconflicted_state_map)
+      partial_resolved_state =
+        iterative_auth_checks(sorted_control_events, unconflicted_state_map, room_events)
 
       other_conflicted_event_ids =
         MapSet.difference(full_conflicted_set, conflicted_control_event_ids_with_auth)
 
-      other_conflicted_events =
-        Repo.all(from e in Event, where: e.event_id in ^MapSet.to_list(other_conflicted_event_ids))
+      other_conflicted_events = Enum.map(other_conflicted_event_ids, &room_events[&1])
 
       resolved_power_levels = partial_resolved_state[{"m.room.power_levels", ""}]
 
       sorted_other_events =
-        Enum.sort(other_conflicted_events, mainline_order(resolved_power_levels))
+        Enum.sort(other_conflicted_events, mainline_order(resolved_power_levels, room_events))
 
-      nearly_final_state = iterative_auth_checks(sorted_other_events, partial_resolved_state)
+      nearly_final_state =
+        iterative_auth_checks(sorted_other_events, partial_resolved_state, room_events)
 
       Map.merge(nearly_final_state, unconflicted_state_map)
     end
@@ -101,13 +116,13 @@ defmodule MatrixServer.StateResolution do
     {unconflicted_state_map, conflicted_state_set}
   end
 
-  def auth_difference(state_sets) do
+  def auth_difference(state_sets, room_events) do
     # TODO: memoization possible
     full_auth_chains =
       Enum.map(state_sets, fn state_set ->
         state_set
         |> Map.values()
-        |> full_auth_chain()
+        |> full_auth_chain(room_events)
       end)
 
     auth_chain_union = Enum.reduce(full_auth_chains, MapSet.new(), &MapSet.union/2)
@@ -116,32 +131,24 @@ defmodule MatrixServer.StateResolution do
     MapSet.difference(auth_chain_union, auth_chain_intersection)
   end
 
-  def full_auth_chain(event_ids) do
+  def full_auth_chain(event_ids, room_events) do
     event_ids
-    |> Enum.map(&auth_chain/1)
+    |> Enum.map(&auth_chain(&1, room_events))
     |> Enum.reduce(MapSet.new(), &MapSet.union/2)
   end
 
-  def auth_chain(event_id) do
+  def auth_chain(event_id, room_events) do
     # TODO: handle when auth event is not found.
-    Event
-    |> where([e], e.event_id == ^event_id)
-    |> select([e], e.auth_events)
-    |> Repo.one!()
+    room_events[event_id].auth_events
     |> Enum.reduce(MapSet.new(), fn auth_event_id, acc ->
       auth_event_id
-      |> auth_chain()
+      |> auth_chain(room_events)
       |> MapSet.union(acc)
       |> MapSet.put(auth_event_id)
     end)
   end
 
-  def is_control_event(event_id) when is_binary(event_id) do
-    Event
-    |> where([e], e.event_id == ^event_id)
-    |> Repo.one!()
-    |> is_control_event()
-  end
+  def is_control_event(event_id, room_events), do: is_control_event(room_events[event_id])
 
   def is_control_event(%Event{type: "m.room.power_levels", state_key: ""}), do: true
   def is_control_event(%Event{type: "m.room.join_rules", state_key: ""}), do: true
@@ -157,50 +164,47 @@ defmodule MatrixServer.StateResolution do
 
   def is_control_event(_), do: false
 
-  def rev_top_pow_order(
-        %Event{origin_server_ts: timestamp1, event_id: event_id1} = event1,
-        %Event{origin_server_ts: timestamp2, event_id: event_id2} = event2
-      ) do
-    {power1, power2} = {get_power_level(event1), get_power_level(event2)}
+  def rev_top_pow_order(room_events) do
+    fn %Event{origin_server_ts: timestamp1, event_id: event_id1} = event1,
+       %Event{origin_server_ts: timestamp2, event_id: event_id2} = event2 ->
+      power1 = get_power_level(event1, room_events)
+      power2 = get_power_level(event2, room_events)
 
-    if power1 == power2 do
-      if timestamp1 == timestamp2 do
-        event_id1 <= event_id2
+      if power1 == power2 do
+        if timestamp1 == timestamp2 do
+          event_id1 <= event_id2
+        else
+          timestamp1 < timestamp2
+        end
       else
-        timestamp1 < timestamp2
+        power1 < power2
       end
-    else
-      power1 < power2
     end
   end
 
-  def get_power_level(%Event{sender: sender, auth_events: auth_event_ids}) do
-    pl_content =
-      Event
-      |> where([e], e.event_id in ^auth_event_ids)
-      |> where([e], e.type == "m.room.power_levels")
-      |> select([e], e.content)
-      |> Repo.one()
+  def get_power_level(%Event{sender: sender, auth_events: auth_event_ids}, room_events) do
+    pl_event_id =
+      Enum.find(auth_event_ids, fn id ->
+        room_events[id].type == "m.room.power_levels"
+      end)
 
-    case pl_content do
-      %{"users" => pl_users} -> Map.get(pl_users, sender, 0)
+    case room_events[pl_event_id] do
+      %Event{content: %{"users" => pl_users}} -> Map.get(pl_users, sender, 0)
       nil -> 0
     end
   end
 
-  def mainline_order(event_id) do
+  def mainline_order(event_id, room_events) do
     mainline_map =
-      Event
-      |> where([e], e.event_id == ^event_id)
-      |> Repo.one!()
-      |> mainline()
+      room_events[event_id]
+      |> mainline(room_events)
       |> Enum.with_index()
       |> Enum.into(%{})
 
     fn %Event{origin_server_ts: timestamp1, event_id: event_id1} = event1,
        %Event{origin_server_ts: timestamp2, event_id: event_id2} = event2 ->
-      mainline_depth1 = get_mainline_depth(mainline_map, event1)
-      mainline_depth2 = get_mainline_depth(mainline_map, event2)
+      mainline_depth1 = get_mainline_depth(mainline_map, event1, room_events)
+      mainline_depth2 = get_mainline_depth(mainline_map, event2, room_events)
 
       if mainline_depth1 == mainline_depth2 do
         if timestamp1 == timestamp2 do
@@ -214,8 +218,8 @@ defmodule MatrixServer.StateResolution do
     end
   end
 
-  defp get_mainline_depth(mainline_map, event) do
-    mainline = mainline(event)
+  defp get_mainline_depth(mainline_map, event, room_events) do
+    mainline = mainline(event, room_events)
 
     result =
       Enum.find_value(mainline, fn mainline_event ->
@@ -232,28 +236,27 @@ defmodule MatrixServer.StateResolution do
     end
   end
 
-  def mainline(event) do
+  def mainline(event, room_events) do
     event
-    |> mainline([])
+    |> mainline([], room_events)
     |> Enum.reverse()
   end
 
-  def mainline(%Event{auth_events: auth_event_ids} = event, acc) do
-    pl_event =
-      Event
-      |> where([e], e.event_id in ^auth_event_ids)
-      |> where([e], e.type == "m.room.power_levels")
-      |> Repo.one()
+  def mainline(%Event{auth_events: auth_event_ids} = event, acc, room_events) do
+    pl_event_id =
+      Enum.find(auth_event_ids, fn id ->
+        room_events[id].type == "m.room.power_levels"
+      end)
 
-    case pl_event do
-      %Event{} -> mainline(pl_event, [event | acc])
+    case room_events[pl_event_id] do
+      %Event{} = pl_event -> mainline(pl_event, [event | acc], room_events)
       nil -> [event | acc]
     end
   end
 
-  def iterative_auth_checks(events, state_set) do
+  def iterative_auth_checks(events, state_set, room_events) do
     Enum.reduce(events, state_set, fn event, acc ->
-      if is_authorized2(event, acc), do: insert_event(event, acc), else: acc
+      if is_authorized2(event, acc, room_events), do: insert_event(event, acc), else: acc
     end)
   end
 
@@ -261,11 +264,10 @@ defmodule MatrixServer.StateResolution do
     Map.put(state_set, {event_type, state_key}, event_id)
   end
 
-  def is_authorized2(%Event{auth_events: auth_event_ids} = event, state_set) do
+  def is_authorized2(%Event{auth_events: auth_event_ids} = event, state_set, room_events) do
     state_set =
-      Event
-      |> where([e], e.event_id in ^auth_event_ids)
-      |> Repo.all()
+      auth_event_ids
+      |> Enum.map(&room_events[&1])
       |> Enum.reduce(state_set, fn %Event{
                                      type: event_type,
                                      state_key: state_key,
@@ -275,50 +277,48 @@ defmodule MatrixServer.StateResolution do
         Map.put_new(acc, {event_type, state_key}, event_id)
       end)
 
-    is_authorized(event, state_set)
+    is_authorized(event, state_set, room_events)
   end
 
   # TODO: join and power levels events
-  def is_authorized(%Event{type: "m.room.create", prev_events: prev_events}, _),
+  def is_authorized(%Event{type: "m.room.create", prev_events: prev_events}, _, _),
     do: prev_events == []
 
   def is_authorized(
         %Event{type: "m.room.member", content: %{"membership" => "join"}, state_key: user},
-        state_set
+        state_set,
+        room_events
       ) do
-    allowed_to_join(user, state_set)
+    allowed_to_join(user, state_set, room_events)
   end
 
-  def is_authorized(%Event{sender: sender} = event, state_set) do
-    in_room(sender, state_set) and
-      has_power_level(sender, get_power_levels(state_set), get_event_power_level(event))
-  end
-
-  def in_room(user, state_set) when is_map_key(state_set, {"m.room.member", user}) do
-    content =
-      Repo.one!(
-        from e in Event,
-          where: e.event_id == ^state_set[{"m.room.member", user}],
-          select: e.content
+  def is_authorized(%Event{sender: sender} = event, state_set, room_events) do
+    in_room(sender, state_set, room_events) and
+      has_power_level(
+        sender,
+        get_power_levels(state_set, room_events),
+        get_event_power_level(event)
       )
+  end
 
-    case content["membership"] do
+  def in_room(user, state_set, room_events) when is_map_key(state_set, {"m.room.member", user}) do
+    event_id = state_set[{"m.room.member", user}]
+
+    case room_events[event_id].content["membership"] do
       "join" -> true
       _ -> false
     end
   end
 
-  def in_room(_, _), do: false
+  def in_room(_, _, _), do: false
 
-  def get_power_levels(state_set) when is_map_key(state_set, {"m.room.power_levels", ""}) do
-    Repo.one!(
-      from e in Event,
-        where: e.event_id == ^state_set[{"m.room.power_levels", ""}],
-        select: e.content
-    )
+  def get_power_levels(state_set, room_events)
+      when is_map_key(state_set, {"m.room.power_levels", ""}) do
+    event_id = state_set[{"m.room.power_levels", ""}]
+    room_events[event_id].content
   end
 
-  def get_power_levels(_), do: nil
+  def get_power_levels(_, _), do: nil
 
   def has_power_level(user, %{"users" => users}, level) do
     Map.get(users, user, 0) >= level
@@ -332,10 +332,9 @@ defmodule MatrixServer.StateResolution do
   defp get_event_power_level(_), do: 50
 
   # No join rules specified, allow joining for room creator only.
-  def allowed_to_join(user, state_set)
+  def allowed_to_join(user, state_set, room_events)
       when not is_map_key(state_set, {"m.room.join_rules", ""}) do
-    Repo.one!(
-      from e in Event, where: e.event_id == ^state_set[{"m.room.create", ""}], select: e.sender
-    ) == user
+    event_id = state_set[{"m.room.create", ""}]
+    room_events[event_id].sender == user
   end
 end
