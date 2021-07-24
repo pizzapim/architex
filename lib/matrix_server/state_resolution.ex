@@ -12,7 +12,7 @@ defmodule MatrixServer.StateResolution do
     |> Map.put(:auth_events, ["create", "join_charlie", "b"])
   end
 
-  def resolve(%Event{room_id: room_id} = event, apply_state \\ false) do
+  def resolve(%Event{room_id: room_id} = event, apply_state) do
     room_events =
       Event
       |> where([e], e.room_id == ^room_id)
@@ -31,7 +31,7 @@ defmodule MatrixServer.StateResolution do
     state_sets =
       prev_event_ids
       |> Enum.map(&room_events[&1])
-      |> Enum.map(&resolve(&1, room_events))
+      |> Enum.map(&resolve(&1, room_events, apply_state))
 
     resolved_state = do_resolve(state_sets, room_events)
     # TODO: check if state event
@@ -55,6 +55,7 @@ defmodule MatrixServer.StateResolution do
   end
 
   def do_resolve(state_sets, room_events, unconflicted_state_map, conflicted_state_set) do
+    # TODO: make the state set a hashmap instead of a set.
     full_conflicted_set =
       MapSet.union(conflicted_state_set, auth_difference(state_sets, room_events))
 
@@ -82,8 +83,8 @@ defmodule MatrixServer.StateResolution do
 
     conflicted_control_events_with_auth_ids
     |> MapSet.difference(full_conflicted_set)
-    |> Enum.map(&room_events[&1])
     |> Enum.sort(mainline_order(resolved_power_levels, room_events))
+    |> Enum.map(&room_events[&1])
     |> iterative_auth_checks(partial_resolved_state, room_events)
     |> Map.merge(unconflicted_state_map)
   end
@@ -205,8 +206,9 @@ defmodule MatrixServer.StateResolution do
       |> Enum.with_index()
       |> Enum.into(%{})
 
-    fn %Event{origin_server_ts: timestamp1, event_id: event_id1} = event1,
-       %Event{origin_server_ts: timestamp2, event_id: event_id2} = event2 ->
+    fn event_id1, event_id2 ->
+      %Event{origin_server_ts: timestamp1} = event1 = room_events[event_id1]
+      %Event{origin_server_ts: timestamp2} = event2 = room_events[event_id2]
       mainline_depth1 = get_mainline_depth(mainline_map, event1, room_events)
       mainline_depth2 = get_mainline_depth(mainline_map, event2, room_events)
 
@@ -343,5 +345,22 @@ defmodule MatrixServer.StateResolution do
       when not is_map_key(state_set, {"m.room.join_rules", ""}) do
     event_id = state_set[{"m.room.create", ""}]
     room_events[event_id].sender == user
+  end
+
+  def is_authorized_by_auth_events(%Event{auth_events: auth_event_ids} = event) do
+    # We assume the auth events are validated beforehand.
+    auth_events =
+      Event
+      |> where([e], e.event_id in ^auth_event_ids)
+      |> select([e], {e.event_id, e})
+      |> Repo.all()
+      |> Enum.into(%{})
+
+    # TODO: make the state set a mapping to Event struct.
+    state_set = Enum.reduce(auth_events, %{}, fn {event_id, %Event{type: type, state_key: state_key}}, acc ->
+      Map.put(acc, {type, state_key}, event_id)
+    end)
+
+    is_authorized(event, state_set, auth_events)
   end
 end
