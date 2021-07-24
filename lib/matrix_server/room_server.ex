@@ -1,8 +1,6 @@
 defmodule MatrixServer.RoomServer do
   use GenServer
 
-  import Ecto.Query
-
   alias MatrixServer.{Repo, Room, Event, Account, StateResolution}
   alias MatrixServerWeb.API.CreateRoom
 
@@ -46,13 +44,14 @@ defmodule MatrixServer.RoomServer do
          room_id
        ) do
     create_room_event = Event.create_room(room_id, MatrixServer.get_mxid(localpart), room_version)
+
     verify_event(create_room_event)
     |> IO.inspect()
 
     {:ok, %{}}
   end
 
-  defp verify_event(%Event{auth_events: auth_event_ids} = event) do
+  defp verify_event(event) do
     # Check the following things:
     # 1. TODO: Is a valid event, otherwise it is dropped.
     # 2. TODO: Passes signature checks, otherwise it is dropped.
@@ -61,15 +60,8 @@ defmodule MatrixServer.RoomServer do
     # 5. Passes authorization rules based on the state at the event, otherwise it is rejected.
     # 6. TODO: Passes authorization rules based on the current state of the room, otherwise it is "soft failed".
     if StateResolution.is_authorized_by_auth_events(event) do
-      auth_events =
-        Event
-        |> where([e], e.event_id in ^auth_event_ids)
-        |> select([e], {e.event_id, e})
-        |> Repo.all()
-        |> Enum.into(%{})
-      # TODO: make the state set a mapping to Event struct.
       state_set = StateResolution.resolve(event, false)
-      StateResolution.is_authorized(event, state_set, auth_events)
+      StateResolution.is_authorized(event, state_set)
     else
       false
     end
