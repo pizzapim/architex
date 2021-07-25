@@ -106,4 +106,20 @@ defmodule MatrixServer.Event do
   def generate_event_id do
     "$" <> MatrixServer.random_string(17) <> ":" <> MatrixServer.server_name()
   end
+
+  def is_control_event(%Event{type: "m.room.power_levels", state_key: ""}), do: true
+  def is_control_event(%Event{type: "m.room.join_rules", state_key: ""}), do: true
+
+  def is_control_event(%Event{
+        type: "m.room.member",
+        state_key: state_key,
+        sender: sender,
+        content: %{membership: membership}
+      })
+      when sender != state_key and membership in ["leave", "ban"],
+      do: true
+
+  def is_control_event(_), do: false
+
+  def is_state_event(%Event{state_key: state_key}), do: state_key != nil
 end

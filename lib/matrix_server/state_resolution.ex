@@ -3,15 +3,6 @@ defmodule MatrixServer.StateResolution do
 
   alias MatrixServer.{Repo, Event}
 
-  def example do
-    %Event{content: content} = event = Event.power_levels("room1", "charlie")
-    event = %Event{event | content: %{content | "ban" => 0}}
-
-    event
-    |> Map.put(:prev_events, ["b", "fork"])
-    |> Map.put(:auth_events, ["create", "join_charlie", "b"])
-  end
-
   def resolve(%Event{room_id: room_id} = event, apply_state) do
     room_events =
       Event
@@ -34,8 +25,8 @@ defmodule MatrixServer.StateResolution do
       |> Enum.map(&resolve(&1, room_events, apply_state))
 
     resolved_state = do_resolve(state_sets, room_events)
-    # TODO: check if state event
-    if apply_state do
+
+    if apply_state and Event.is_state_event(event) do
       Map.put(resolved_state, {type, state_key}, event)
     else
       resolved_state
@@ -55,13 +46,12 @@ defmodule MatrixServer.StateResolution do
   end
 
   def do_resolve(state_sets, room_events, unconflicted_state_map, conflicted_state_set) do
-    # TODO: make the state set a hashmap instead of a set.
     full_conflicted_set =
       MapSet.union(conflicted_state_set, auth_difference(state_sets, room_events))
 
     conflicted_control_event_ids =
       full_conflicted_set
-      |> Enum.filter(&is_control_event(&1, room_events))
+      |> Enum.filter(&Event.is_control_event(room_events[&1]))
       |> MapSet.new()
 
     conflicted_control_events_with_auth_ids =
@@ -125,7 +115,6 @@ defmodule MatrixServer.StateResolution do
   end
 
   def auth_difference(state_sets, room_events) do
-    # TODO: memoization possible
     full_auth_chains =
       Enum.map(state_sets, fn state_set ->
         state_set
@@ -146,7 +135,6 @@ defmodule MatrixServer.StateResolution do
   end
 
   def auth_chain(%Event{auth_events: auth_events}, room_events) do
-    # TODO: handle when auth event is not found.
     auth_events
     |> Enum.map(&room_events[&1])
     |> Enum.reduce(MapSet.new(), fn %Event{event_id: auth_event_id} = auth_event, acc ->
@@ -156,22 +144,6 @@ defmodule MatrixServer.StateResolution do
       |> MapSet.put(auth_event_id)
     end)
   end
-
-  def is_control_event(event_id, room_events), do: is_control_event(room_events[event_id])
-
-  def is_control_event(%Event{type: "m.room.power_levels", state_key: ""}), do: true
-  def is_control_event(%Event{type: "m.room.join_rules", state_key: ""}), do: true
-
-  def is_control_event(%Event{
-        type: "m.room.member",
-        state_key: state_key,
-        sender: sender,
-        content: %{membership: membership}
-      })
-      when sender != state_key and membership in ["leave", "ban"],
-      do: true
-
-  def is_control_event(_), do: false
 
   def rev_top_pow_order(room_events) do
     fn %Event{origin_server_ts: timestamp1, event_id: event_id1} = event1,
@@ -348,5 +320,14 @@ defmodule MatrixServer.StateResolution do
       |> Enum.reduce(%{}, &update_state_set/2)
 
     is_authorized(event, state_set)
+  end
+
+  def testing do
+    %Event{content: content} = event = Event.power_levels("room1", "charlie")
+    event = %Event{event | content: %{content | "ban" => 0}}
+
+    event
+    |> Map.put(:prev_events, ["b", "fork"])
+    |> Map.put(:auth_events, ["create", "join_charlie", "b"])
   end
 end

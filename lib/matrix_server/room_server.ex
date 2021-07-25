@@ -1,6 +1,8 @@
 defmodule MatrixServer.RoomServer do
   use GenServer
 
+  import Ecto.Query
+
   alias MatrixServer.{Repo, Room, Event, Account, StateResolution}
   alias MatrixServerWeb.API.CreateRoom
 
@@ -45,13 +47,12 @@ defmodule MatrixServer.RoomServer do
        ) do
     create_room_event = Event.create_room(room_id, MatrixServer.get_mxid(localpart), room_version)
 
-    verify_event(create_room_event)
-    |> IO.inspect()
+    verify_and_insert_event(create_room_event)
 
     {:ok, %{}}
   end
 
-  defp verify_event(event) do
+  defp verify_and_insert_event(event) do
     # Check the following things:
     # 1. TODO: Is a valid event, otherwise it is dropped.
     # 2. TODO: Passes signature checks, otherwise it is dropped.
@@ -61,9 +62,22 @@ defmodule MatrixServer.RoomServer do
     # 6. TODO: Passes authorization rules based on the current state of the room, otherwise it is "soft failed".
     if StateResolution.is_authorized_by_auth_events(event) do
       state_set = StateResolution.resolve(event, false)
-      StateResolution.is_authorized(event, state_set)
+
+      if StateResolution.is_authorized(event, state_set) do
+        # TODO: Assume the event is a forward extremity, should check this actually.
+        Room.update_forward_extremities(event)
+        {:ok, event} = Repo.insert(event)
+        {:ok, state_set}
+      else
+        {:error, :rejected}
+      end
     else
-      false
+      {:error, :rejected}
     end
+  end
+
+  def testing do
+    account = Repo.one!(from a in Account, limit: 1)
+    create_room(%CreateRoom{}, account)
   end
 end
