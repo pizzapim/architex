@@ -1,7 +1,9 @@
 defmodule MatrixServer.StateResolution do
   import Ecto.Query
 
-  alias MatrixServer.{Repo, Event}
+  alias MatrixServer.{Repo, Event, Room}
+
+  def resolve(event), do: resolve(event, true)
 
   def resolve(%Event{room_id: room_id} = event, apply_state) do
     room_events =
@@ -320,6 +322,23 @@ defmodule MatrixServer.StateResolution do
       |> Enum.reduce(%{}, &update_state_set/2)
 
     is_authorized(event, state_set)
+  end
+
+  def resolve_forward_extremities(%Event{room_id: room_id}) do
+    room_events =
+      Event
+      |> where([e], e.room_id == ^room_id)
+      |> select([e], {e.event_id, e})
+      |> Repo.all()
+      |> Enum.into(%{})
+
+    Event
+    |> where([e], e.room_id == ^room_id)
+    |> join(:inner, [e], r in Room, on: e.room_id == r.id)
+    |> where([e, r], e.event_id == fragment("ANY(?)", r.forward_extremities))
+    |> Repo.all()
+    |> Enum.map(&resolve/1)
+    |> do_resolve(room_events)
   end
 
   def testing do
