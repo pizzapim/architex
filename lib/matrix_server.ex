@@ -31,4 +31,20 @@ defmodule MatrixServer do
   end
 
   def default_room_version, do: "7"
+
+  def get_domain(id) do
+    case String.split(id, ":") do
+      [_, server_name] -> server_name
+      _ -> nil
+    end
+  end
+
+  # https://elixirforum.com/t/22709/9
+  def has_duplicates?(list) do
+    list
+    |> Enum.reduce_while(%MapSet{}, fn x, acc ->
+      if MapSet.member?(acc, x), do: {:halt, false}, else: {:cont, MapSet.put(acc, x)}
+    end)
+    |> is_boolean()
+  end
 end

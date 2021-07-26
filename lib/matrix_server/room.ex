@@ -27,7 +27,7 @@ defmodule MatrixServer.Room do
   end
 
   def generate_room_id do
-    "!" <> MatrixServer.random_string(18) <> "@" <> MatrixServer.server_name()
+    "!" <> MatrixServer.random_string(18) <> ":" <> MatrixServer.server_name()
   end
 
   def update_forward_extremities(%Event{

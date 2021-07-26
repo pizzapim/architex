@@ -38,8 +38,16 @@ defmodule MatrixServer.RoomServer do
     Repo.transaction(fn ->
       with {:ok, create_room_event, state_set} <-
              room_creation_create_room(account, input, room, state_set),
-           {:ok, _join_creator_event, state_set} <-
-             room_creation_join_creator(account, room, state_set, create_room_event) do
+           {:ok, join_creator_event, state_set} <-
+             room_creation_join_creator(account, room, state_set, create_room_event),
+           {:ok, _power_levels_event, state_set} <-
+             room_creation_power_levels(
+               account,
+               room,
+               state_set,
+               create_room_event,
+               join_creator_event
+             ) do
         {:ok, %{room_id: room_id, state_set: state_set}}
       else
         _ -> {:error, :something}
@@ -61,11 +69,24 @@ defmodule MatrixServer.RoomServer do
          %Account{localpart: localpart},
          %Room{id: room_id},
          state_set,
-         %Event{event_id: create_room_event_id}
+         %Event{event_id: create_room_id}
        ) do
     Event.join(room_id, MatrixServer.get_mxid(localpart))
-    |> Map.put(:auth_events, [create_room_event_id])
-    |> Map.put(:prev_events, [create_room_event_id])
+    |> Map.put(:auth_events, [create_room_id])
+    |> Map.put(:prev_events, [create_room_id])
+    |> verify_and_insert_event(state_set)
+  end
+
+  defp room_creation_power_levels(
+         %Account{localpart: localpart},
+         %Room{id: room_id},
+         state_set,
+         %Event{event_id: create_room_id},
+         %Event{event_id: join_creator_id}
+       ) do
+    Event.power_levels(room_id, MatrixServer.get_mxid(localpart))
+    |> Map.put(:auth_events, [create_room_id, join_creator_id])
+    |> Map.put(:prev_events, [join_creator_id])
     |> verify_and_insert_event(state_set)
   end
 
@@ -77,24 +98,28 @@ defmodule MatrixServer.RoomServer do
     # 4. Passes authorization rules based on the event's auth events, otherwise it is rejected.
     # 5. Passes authorization rules based on the state at the event, otherwise it is rejected.
     # 6. Passes authorization rules based on the current state of the room, otherwise it is "soft failed".
-    if StateResolution.is_authorized_by_auth_events(event) do
-      state_set = StateResolution.resolve(event, false)
+    if Event.prevalidate(event) do
+      if StateResolution.is_authorized_by_auth_events(event) do
+        state_set = StateResolution.resolve(event, false)
 
-      if StateResolution.is_authorized(event, state_set) do
-        if StateResolution.is_authorized(event, current_state_set) do
-          # TODO: Assume the event is a forward extremity, should check this actually.
-          Room.update_forward_extremities(event)
-          {:ok, event} = Repo.insert(event)
-          state_set = StateResolution.resolve_forward_extremities(event)
-          {:ok, event, state_set}
+        if StateResolution.is_authorized(event, state_set) do
+          if StateResolution.is_authorized(event, current_state_set) do
+            # We assume here that the event is always a forward extremity.
+            Room.update_forward_extremities(event)
+            {:ok, event} = Repo.insert(event)
+            state_set = StateResolution.resolve_forward_extremities(event)
+            {:ok, event, state_set}
+          else
+            {:error, :soft_failed}
+          end
         else
-          {:error, :soft_failed}
+          {:error, :rejected}
         end
       else
         {:error, :rejected}
       end
     else
-      {:error, :rejected}
+      {:error, :invalid}
     end
   end
 
