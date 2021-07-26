@@ -1,19 +1,16 @@
-# MatrixServer
+# Matrix homeserver
 
-To start your Phoenix server:
+This is my attempt at creating a Matrix homeserver in Elixir.
+Currently it is in a very early stage.
 
-  * Install dependencies with `mix deps.get`
-  * Create and migrate your database with `mix ecto.setup`
-  * Start Phoenix endpoint with `mix phx.server`
+Some noteworthy contributions:
 
-Now you can visit [`localhost:4000`](http://localhost:4000) from your browser.
+* `lib/matrix_server/state_resolution.ex`: Implementation of version 2 of the Matrix state resolution algorithm.
+* `lib/matrix_server/room_server.ex`: A GenServer that holds and manages the state of a room.
 
-Ready to run in production? Please [check our deployment guides](https://hexdocs.pm/phoenix/deployment.html).
+To run the server in development mode, run:
 
-## Learn more
-
-  * Official website: https://www.phoenixframework.org/
-  * Guides: https://hexdocs.pm/phoenix/overview.html
-  * Docs: https://hexdocs.pm/phoenix
-  * Forum: https://elixirforum.com/c/phoenix-forum
-  * Source: https://github.com/phoenixframework/phoenix
+* Install the latest Erlang, Elixir and Postgresql.
+* Create the database with name `matrix_server_dev` and credentials `matrix_server:matrix_server`.
+* Fetch Elixir dependencies with `mix deps.get`.
+* Run the server using `mix phx.server`.
