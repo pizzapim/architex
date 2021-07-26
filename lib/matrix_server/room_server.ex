@@ -29,12 +29,17 @@ defmodule MatrixServer.RoomServer do
 
   @impl true
   def init(opts) do
-    %Room{id: room_id} = Keyword.fetch!(opts, :room)
+    %Room{id: room_id} = room = Keyword.fetch!(opts, :room)
     input = Keyword.fetch!(opts, :input)
     account = Keyword.fetch!(opts, :account)
 
+    state_set = %{}
+
     Repo.transaction(fn ->
-      with {:ok, state_set} <- insert_create_room_event(account, input, room_id) do
+      with {:ok, create_room_event, state_set} <-
+             room_creation_create_room(account, input, room, state_set),
+           {:ok, _join_creator_event, state_set} <-
+             room_creation_join_creator(account, room, state_set, create_room_event) do
         {:ok, %{room_id: room_id, state_set: state_set}}
       else
         _ -> {:error, :something}
@@ -42,14 +47,26 @@ defmodule MatrixServer.RoomServer do
     end)
   end
 
-  defp insert_create_room_event(
+  defp room_creation_create_room(
          %Account{localpart: localpart},
          %CreateRoom{room_version: room_version},
-         room_id
+         %Room{id: room_id},
+         _state_set
        ) do
-    create_room_event = Event.create_room(room_id, MatrixServer.get_mxid(localpart), room_version)
+    Event.create_room(room_id, MatrixServer.get_mxid(localpart), room_version)
+    |> verify_and_insert_event(%{})
+  end
 
-    verify_and_insert_event(create_room_event, %{})
+  defp room_creation_join_creator(
+         %Account{localpart: localpart},
+         %Room{id: room_id},
+         state_set,
+         %Event{event_id: create_room_event_id}
+       ) do
+    Event.join(room_id, MatrixServer.get_mxid(localpart))
+    |> Map.put(:auth_events, [create_room_event_id])
+    |> Map.put(:prev_events, [create_room_event_id])
+    |> verify_and_insert_event(state_set)
   end
 
   defp verify_and_insert_event(event, current_state_set) do
@@ -69,7 +86,7 @@ defmodule MatrixServer.RoomServer do
           Room.update_forward_extremities(event)
           {:ok, event} = Repo.insert(event)
           state_set = StateResolution.resolve_forward_extremities(event)
-          {:ok, state_set}
+          {:ok, event, state_set}
         else
           {:error, :soft_failed}
         end

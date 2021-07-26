@@ -24,7 +24,7 @@ defmodule MatrixServer.StateResolution do
     state_sets =
       prev_event_ids
       |> Enum.map(&room_events[&1])
-      |> Enum.map(&resolve(&1, room_events, apply_state))
+      |> Enum.map(&resolve(&1, room_events, true))
 
     resolved_state = do_resolve(state_sets, room_events)
 
@@ -38,7 +38,7 @@ defmodule MatrixServer.StateResolution do
   def do_resolve([], _), do: %{}
 
   def do_resolve(state_sets, room_events) do
-    {unconflicted_state_map, conflicted_state_set} = calculate_conflict(state_sets)
+    {unconflicted_state_map, conflicted_state_set} = calculate_conflict(state_sets, room_events)
 
     if MapSet.size(conflicted_state_set) == 0 do
       unconflicted_state_map
@@ -81,7 +81,7 @@ defmodule MatrixServer.StateResolution do
     |> Map.merge(unconflicted_state_map)
   end
 
-  def calculate_conflict(state_sets) do
+  def calculate_conflict(state_sets, room_events) do
     {unconflicted, conflicted} =
       state_sets
       |> Enum.flat_map(&Map.keys/1)
@@ -101,10 +101,10 @@ defmodule MatrixServer.StateResolution do
       end)
 
     unconflicted_state_map =
-      Enum.into(unconflicted, %{}, fn {state_pair, events} ->
-        event = MapSet.to_list(events) |> hd()
+      Enum.into(unconflicted, %{}, fn {state_pair, event_ids} ->
+        event_id = MapSet.to_list(event_ids) |> hd()
 
-        {state_pair, event}
+        {state_pair, room_events[event_id]}
       end)
 
     conflicted_state_set =
