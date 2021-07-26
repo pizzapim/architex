@@ -17,7 +17,7 @@ defmodule MatrixServer.Event do
     belongs_to :room, Room, type: :string
   end
 
-  def new(room_id, sender) do
+  def new(%Room{id: room_id}, sender) do
     %Event{
       room_id: room_id,
       sender: sender,
@@ -28,9 +28,9 @@ defmodule MatrixServer.Event do
     }
   end
 
-  def create_room(room_id, creator, room_version) do
+  def create_room(room, creator, room_version) do
     %Event{
-      new(room_id, creator)
+      new(room, creator)
       | type: "m.room.create",
         state_key: "",
         content: %{
@@ -40,9 +40,9 @@ defmodule MatrixServer.Event do
     }
   end
 
-  def join(room_id, sender) do
+  def join(room, sender) do
     %Event{
-      new(room_id, sender)
+      new(room, sender)
       | type: "m.room.member",
         state_key: sender,
         content: %{
@@ -51,9 +51,9 @@ defmodule MatrixServer.Event do
     }
   end
 
-  def power_levels(room_id, sender) do
+  def power_levels(room, sender) do
     %Event{
-      new(room_id, sender)
+      new(room, sender)
       | type: "m.room.power_levels",
         state_key: "",
         content: %{
@@ -75,9 +75,9 @@ defmodule MatrixServer.Event do
     }
   end
 
-  def room_name(room_id, sender, name) do
+  def name(room, sender, name) do
     %Event{
-      new(room_id, sender)
+      new(room, sender)
       | type: "m.room.name",
         state_key: "",
         content: %{
@@ -86,9 +86,9 @@ defmodule MatrixServer.Event do
     }
   end
 
-  def room_topic(room_id, sender, topic) do
+  def topic(room, sender, topic) do
     %Event{
-      new(room_id, sender)
+      new(room, sender)
       | type: "m.room.topic",
         state_key: "",
         content: %{
@@ -122,13 +122,15 @@ defmodule MatrixServer.Event do
   # We assume that required keys, as well as in the content, is already validated.
 
   # Rule 1.4 is left to changeset validation.
-  def prevalidate(%Event{
-        type: "m.room.create",
-        prev_events: prev_events,
-        auth_events: auth_events,
-        room_id: room_id,
-        sender: sender
-      }) do
+  def prevalidate(
+        %Event{
+          type: "m.room.create",
+          prev_events: prev_events,
+          auth_events: auth_events,
+          room_id: room_id,
+          sender: sender
+        } = event
+      ) do
     # TODO: error check on domains?
     # TODO: rule 1.3
 

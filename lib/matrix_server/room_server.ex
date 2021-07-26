@@ -29,28 +29,37 @@ defmodule MatrixServer.RoomServer do
 
   @impl true
   def init(opts) do
-    %Room{id: room_id} = room = Keyword.fetch!(opts, :room)
+    room = Keyword.fetch!(opts, :room)
     input = Keyword.fetch!(opts, :input)
     account = Keyword.fetch!(opts, :account)
 
-    state_set = %{}
-
     Repo.transaction(fn ->
-      with {:ok, create_room_event, state_set} <-
-             room_creation_create_room(account, input, room, state_set),
-           {:ok, join_creator_event, state_set} <-
-             room_creation_join_creator(account, room, state_set, create_room_event),
-           {:ok, _power_levels_event, state_set} <-
+      with {:ok, create_room_id, state_set, room} <-
+             room_creation_create_room(account, input, room),
+           {:ok, join_creator_id, state_set, room} <-
+             room_creation_join_creator(account, room, state_set, [create_room_id]),
+           {:ok, pl_id, state_set, room} <-
              room_creation_power_levels(
                account,
                room,
                state_set,
-               create_room_event,
-               join_creator_event
-             ) do
-        {:ok, %{room_id: room_id, state_set: state_set}}
+               [create_room_id, join_creator_id]
+             ),
+           {:ok, _, state_set, room} <-
+             room_creation_name(account, input, room, state_set, [
+               create_room_id,
+               join_creator_id,
+               pl_id
+             ]),
+           {:ok, _, state_set, room} <-
+             room_creation_topic(account, input, room, state_set, [
+               create_room_id,
+               join_creator_id,
+               pl_id
+             ]) do
+        {:ok, %{room: room, state_set: state_set}}
       else
-        _ -> {:error, :something}
+        _ -> {:error, :validation}
       end
     end)
   end
@@ -58,39 +67,71 @@ defmodule MatrixServer.RoomServer do
   defp room_creation_create_room(
          %Account{localpart: localpart},
          %CreateRoom{room_version: room_version},
-         %Room{id: room_id},
-         _state_set
+         room
        ) do
-    Event.create_room(room_id, MatrixServer.get_mxid(localpart), room_version)
-    |> verify_and_insert_event(%{})
+    Event.create_room(room, MatrixServer.get_mxid(localpart), room_version)
+    |> verify_and_insert_event(%{}, room)
   end
 
   defp room_creation_join_creator(
          %Account{localpart: localpart},
-         %Room{id: room_id},
+         room,
          state_set,
-         %Event{event_id: create_room_id}
+         auth_events
        ) do
-    Event.join(room_id, MatrixServer.get_mxid(localpart))
-    |> Map.put(:auth_events, [create_room_id])
-    |> Map.put(:prev_events, [create_room_id])
-    |> verify_and_insert_event(state_set)
+    Event.join(room, MatrixServer.get_mxid(localpart))
+    |> Map.put(:auth_events, auth_events)
+    |> verify_and_insert_event(state_set, room)
   end
 
   defp room_creation_power_levels(
          %Account{localpart: localpart},
-         %Room{id: room_id},
+         room,
          state_set,
-         %Event{event_id: create_room_id},
-         %Event{event_id: join_creator_id}
+         auth_events
        ) do
-    Event.power_levels(room_id, MatrixServer.get_mxid(localpart))
-    |> Map.put(:auth_events, [create_room_id, join_creator_id])
-    |> Map.put(:prev_events, [join_creator_id])
-    |> verify_and_insert_event(state_set)
+    Event.power_levels(room, MatrixServer.get_mxid(localpart))
+    |> Map.put(:auth_events, auth_events)
+    |> verify_and_insert_event(state_set, room)
   end
 
-  defp verify_and_insert_event(event, current_state_set) do
+  defp room_creation_name(_, %CreateRoom{name: nil}, room, state_set, _) do
+    {:ok, nil, state_set, room}
+  end
+
+  defp room_creation_name(
+         %Account{localpart: localpart},
+         %CreateRoom{name: name},
+         room,
+         state_set,
+         auth_events
+       ) do
+    Event.name(room, MatrixServer.get_mxid(localpart), name)
+    |> Map.put(:auth_events, auth_events)
+    |> verify_and_insert_event(state_set, room)
+  end
+
+  defp room_creation_topic(_, %CreateRoom{topic: nil}, room, state_set, _) do
+    {:ok, nil, state_set, room}
+  end
+
+  defp room_creation_topic(
+         %Account{localpart: localpart},
+         %CreateRoom{topic: topic},
+         room,
+         state_set,
+         auth_events
+       ) do
+    Event.topic(room, MatrixServer.get_mxid(localpart), topic)
+    |> Map.put(:auth_events, auth_events)
+    |> verify_and_insert_event(state_set, room)
+  end
+
+  defp verify_and_insert_event(
+         %Event{event_id: event_id} = event,
+         current_state_set,
+         %Room{forward_extremities: forward_extremities} = room
+       ) do
     # Check the following things:
     # 1. TODO: Is a valid event, otherwise it is dropped.
     # 2. TODO: Passes signature checks, otherwise it is dropped.
@@ -98,6 +139,8 @@ defmodule MatrixServer.RoomServer do
     # 4. Passes authorization rules based on the event's auth events, otherwise it is rejected.
     # 5. Passes authorization rules based on the state at the event, otherwise it is rejected.
     # 6. Passes authorization rules based on the current state of the room, otherwise it is "soft failed".
+    event = %Event{event | prev_events: forward_extremities}
+
     if Event.prevalidate(event) do
       if StateResolution.is_authorized_by_auth_events(event) do
         state_set = StateResolution.resolve(event, false)
@@ -105,10 +148,10 @@ defmodule MatrixServer.RoomServer do
         if StateResolution.is_authorized(event, state_set) do
           if StateResolution.is_authorized(event, current_state_set) do
             # We assume here that the event is always a forward extremity.
-            Room.update_forward_extremities(event)
+            room = Room.update_forward_extremities(event, room)
             {:ok, event} = Repo.insert(event)
             state_set = StateResolution.resolve_forward_extremities(event)
-            {:ok, event, state_set}
+            {:ok, event_id, state_set, room}
           else
             {:error, :soft_failed}
           end
@@ -125,6 +168,6 @@ defmodule MatrixServer.RoomServer do
 
   def testing do
     account = Repo.one!(from a in Account, limit: 1)
-    create_room(%CreateRoom{}, account)
+    create_room(%CreateRoom{name: "Sneed", topic: "City slickers"}, account)
   end
 end
