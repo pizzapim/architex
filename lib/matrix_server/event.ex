@@ -229,7 +229,6 @@ defmodule MatrixServer.Event do
        when sender != state_key,
        do: false
 
-  # TODO: Rule 5.3.1
   # All other rules will be checked during state resolution.
   defp do_prevalidate(_, _, _), do: true
 
