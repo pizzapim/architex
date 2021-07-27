@@ -46,6 +46,12 @@ defmodule MatrixServer.RoomServer do
                [create_room_id, join_creator_id]
              ),
            {:ok, _, state_set, room} <-
+             room_creation_preset(account, input, room, state_set, [
+               create_room_id,
+               join_creator_id,
+               pl_id
+             ]),
+           {:ok, _, state_set, room} <-
              room_creation_name(account, input, room, state_set, [
                create_room_id,
                join_creator_id,
@@ -64,33 +70,74 @@ defmodule MatrixServer.RoomServer do
     end)
   end
 
-  defp room_creation_create_room(
-         %Account{localpart: localpart},
-         %CreateRoom{room_version: room_version},
-         room
-       ) do
-    Event.create_room(room, MatrixServer.get_mxid(localpart), room_version)
+  defp room_creation_create_room(account, %CreateRoom{room_version: room_version}, room) do
+    Event.create_room(room, account, room_version)
     |> verify_and_insert_event(%{}, room)
   end
 
-  defp room_creation_join_creator(
-         %Account{localpart: localpart},
-         room,
-         state_set,
-         auth_events
-       ) do
-    Event.join(room, MatrixServer.get_mxid(localpart))
+  defp room_creation_join_creator(account, room, state_set, auth_events) do
+    Event.join(room, account)
     |> Map.put(:auth_events, auth_events)
     |> verify_and_insert_event(state_set, room)
   end
 
-  defp room_creation_power_levels(
-         %Account{localpart: localpart},
-         room,
+  defp room_creation_power_levels(account, room, state_set, auth_events) do
+    Event.power_levels(room, account)
+    |> Map.put(:auth_events, auth_events)
+    |> verify_and_insert_event(state_set, room)
+  end
+
+  # TODO: trusted_private_chat:
+  # All invitees are given the same power level as the room creator.
+  defp room_creation_preset(
+         account,
+         %CreateRoom{preset: nil},
+         %Room{visibility: visibility} = room,
          state_set,
          auth_events
        ) do
-    Event.power_levels(room, MatrixServer.get_mxid(localpart))
+    preset =
+      case visibility do
+        :public -> "public_chat"
+        :private -> "private_chat"
+      end
+
+    room_creation_preset(account, preset, room, state_set, auth_events)
+  end
+
+  defp room_creation_preset(account, %CreateRoom{preset: preset}, room, state_set, auth_events) do
+    room_creation_preset(account, preset, room, state_set, auth_events)
+  end
+
+  defp room_creation_preset(account, preset, room, state_set, auth_events) do
+    {join_rule, his_vis, guest_access} =
+      case preset do
+        "private_chat" -> {"invite", "shared", "can_join"}
+        "trusted_private_chat" -> {"invite", "shared", "can_join"}
+        "public_chat" -> {"public", "shared", "forbidden"}
+      end
+
+    with {:ok, _, _, _} <-
+           room_creation_join_rules(account, join_rule, room, state_set, auth_events),
+         {:ok, _, _, _} <- room_creation_his_vis(account, his_vis, room, state_set, auth_events) do
+      room_creation_guest_access(account, guest_access, room, state_set, auth_events)
+    end
+  end
+
+  defp room_creation_join_rules(account, join_rule, room, state_set, auth_events) do
+    Event.join_rules(room, account, join_rule)
+    |> Map.put(:auth_events, auth_events)
+    |> verify_and_insert_event(state_set, room)
+  end
+
+  defp room_creation_his_vis(account, his_vis, room, state_set, auth_events) do
+    Event.history_visibility(room, account, his_vis)
+    |> Map.put(:auth_events, auth_events)
+    |> verify_and_insert_event(state_set, room)
+  end
+
+  defp room_creation_guest_access(account, guest_access, room, state_set, auth_events) do
+    Event.guest_access(room, account, guest_access)
     |> Map.put(:auth_events, auth_events)
     |> verify_and_insert_event(state_set, room)
   end
@@ -99,14 +146,8 @@ defmodule MatrixServer.RoomServer do
     {:ok, nil, state_set, room}
   end
 
-  defp room_creation_name(
-         %Account{localpart: localpart},
-         %CreateRoom{name: name},
-         room,
-         state_set,
-         auth_events
-       ) do
-    Event.name(room, MatrixServer.get_mxid(localpart), name)
+  defp room_creation_name(account, %CreateRoom{name: name}, room, state_set, auth_events) do
+    Event.name(room, account, name)
     |> Map.put(:auth_events, auth_events)
     |> verify_and_insert_event(state_set, room)
   end
@@ -115,14 +156,8 @@ defmodule MatrixServer.RoomServer do
     {:ok, nil, state_set, room}
   end
 
-  defp room_creation_topic(
-         %Account{localpart: localpart},
-         %CreateRoom{topic: topic},
-         room,
-         state_set,
-         auth_events
-       ) do
-    Event.topic(room, MatrixServer.get_mxid(localpart), topic)
+  defp room_creation_topic(account, %CreateRoom{topic: topic}, room, state_set, auth_events) do
+    Event.topic(room, account, topic)
     |> Map.put(:auth_events, auth_events)
     |> verify_and_insert_event(state_set, room)
   end

@@ -14,6 +14,24 @@ Repo.insert(%Device{
 # Auth difference example from here:
 # https://matrix.org/docs/guides/implementing-stateres#auth-differences
 
+alice =
+  Repo.insert!(%Account{
+    localpart: "alice",
+    password_hash: Bcrypt.hash_pwd_salt("sneed")
+  })
+
+bob =
+  Repo.insert!(%Account{
+    localpart: "bob",
+    password_hash: Bcrypt.hash_pwd_salt("sneed")
+  })
+
+charlie =
+  Repo.insert!(%Account{
+    localpart: "charlie",
+    password_hash: Bcrypt.hash_pwd_salt("sneed")
+  })
+
 room =
   Repo.insert!(%Room{
     id: "room1",
@@ -21,13 +39,13 @@ room =
   })
 
 Repo.insert!(
-  Event.create_room(room, "alice", "v1")
+  Event.create_room(room, alice, "v1")
   |> Map.put(:origin_server_ts, 0)
   |> Map.put(:event_id, "create")
 )
 
 Repo.insert!(
-  Event.join(room, "alice")
+  Event.join(room, alice)
   |> Map.put(:prev_events, ["create"])
   |> Map.put(:auth_events, ["create"])
   |> Map.put(:origin_server_ts, 1)
@@ -35,7 +53,7 @@ Repo.insert!(
 )
 
 Repo.insert!(
-  Event.join(room, "bob")
+  Event.join(room, bob)
   |> Map.put(:prev_events, ["join_alice"])
   |> Map.put(:auth_events, ["create"])
   |> Map.put(:origin_server_ts, 2)
@@ -43,14 +61,14 @@ Repo.insert!(
 )
 
 Repo.insert!(
-  Event.join(room, "charlie")
+  Event.join(room, charlie)
   |> Map.put(:prev_events, ["join_bob"])
   |> Map.put(:auth_events, ["create"])
   |> Map.put(:origin_server_ts, 3)
   |> Map.put(:event_id, "join_charlie")
 )
 
-%Event{content: content} = event = Event.power_levels(room, "alice")
+%Event{content: content} = event = Event.power_levels(room, alice)
 event = %Event{event | content: %{content | "users" => %{"alice" => 100, "bob" => 100}}}
 
 Repo.insert!(
@@ -61,7 +79,7 @@ Repo.insert!(
   |> Map.put(:event_id, "a")
 )
 
-%Event{content: content} = event = Event.power_levels(room, "bob")
+%Event{content: content} = event = Event.power_levels(room, bob)
 
 event = %Event{
   event
@@ -77,7 +95,7 @@ Repo.insert!(
 )
 
 Repo.insert!(
-  Event.topic(room, "alice", "sneed")
+  Event.topic(room, alice, "sneed")
   |> Map.put(:prev_events, ["a"])
   |> Map.put(:auth_events, ["create", "join_alice", "a"])
   |> Map.put(:origin_server_ts, 5)

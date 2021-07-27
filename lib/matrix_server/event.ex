@@ -3,7 +3,7 @@ defmodule MatrixServer.Event do
 
   import Ecto.Query
 
-  alias MatrixServer.{Repo, Room, Event}
+  alias MatrixServer.{Repo, Room, Event, Account}
 
   @primary_key {:event_id, :string, []}
   schema "events" do
@@ -17,10 +17,10 @@ defmodule MatrixServer.Event do
     belongs_to :room, Room, type: :string
   end
 
-  def new(%Room{id: room_id}, sender) do
+  def new(%Room{id: room_id}, %Account{localpart: localpart}) do
     %Event{
       room_id: room_id,
-      sender: sender,
+      sender: MatrixServer.get_mxid(localpart),
       event_id: generate_event_id(),
       origin_server_ts: DateTime.utc_now() |> DateTime.to_unix(),
       prev_events: [],
@@ -28,30 +28,36 @@ defmodule MatrixServer.Event do
     }
   end
 
-  def create_room(room, creator, room_version) do
+  def create_room(room, %Account{localpart: localpart} = creator, room_version) do
+    mxid = MatrixServer.get_mxid(localpart)
+
     %Event{
       new(room, creator)
       | type: "m.room.create",
         state_key: "",
         content: %{
-          "creator" => creator,
+          "creator" => mxid,
           "room_version" => room_version || MatrixServer.default_room_version()
         }
     }
   end
 
-  def join(room, sender) do
+  def join(room, %Account{localpart: localpart} = sender) do
+    mxid = MatrixServer.get_mxid(localpart)
+
     %Event{
       new(room, sender)
       | type: "m.room.member",
-        state_key: sender,
+        state_key: mxid,
         content: %{
           "membership" => "join"
         }
     }
   end
 
-  def power_levels(room, sender) do
+  def power_levels(room, %Account{localpart: localpart} = sender) do
+    mxid = MatrixServer.get_mxid(localpart)
+
     %Event{
       new(room, sender)
       | type: "m.room.power_levels",
@@ -65,7 +71,7 @@ defmodule MatrixServer.Event do
           "redact" => 50,
           "state_default" => 50,
           "users" => %{
-            sender => 50
+            mxid => 50
           },
           "users_default" => 0,
           "notifications" => %{
@@ -97,6 +103,39 @@ defmodule MatrixServer.Event do
     }
   end
 
+  def join_rules(room, sender, join_rule) do
+    %Event{
+      new(room, sender)
+      | type: "m.room.join_rules",
+        state_key: "",
+        content: %{
+          "join_rule" => join_rule
+        }
+    }
+  end
+
+  def history_visibility(room, sender, history_visibility) do
+    %Event{
+      new(room, sender)
+      | type: "m.room.history_visibility",
+        state_key: "",
+        content: %{
+          "history_visibility" => history_visibility
+        }
+    }
+  end
+
+  def guest_access(room, sender, guest_access) do
+    %Event{
+      new(room, sender)
+      | type: "m.room.guest_access",
+        state_key: "",
+        content: %{
+          "guest_access" => guest_access
+        }
+    }
+  end
+
   def generate_event_id do
     "$" <> MatrixServer.random_string(17) <> ":" <> MatrixServer.server_name()
   end
@@ -122,15 +161,13 @@ defmodule MatrixServer.Event do
   # We assume that required keys, as well as in the content, is already validated.
 
   # Rule 1.4 is left to changeset validation.
-  def prevalidate(
-        %Event{
-          type: "m.room.create",
-          prev_events: prev_events,
-          auth_events: auth_events,
-          room_id: room_id,
-          sender: sender
-        } = event
-      ) do
+  def prevalidate(%Event{
+        type: "m.room.create",
+        prev_events: prev_events,
+        auth_events: auth_events,
+        room_id: room_id,
+        sender: sender
+      }) do
     # TODO: error check on domains?
     # TODO: rule 1.3
 

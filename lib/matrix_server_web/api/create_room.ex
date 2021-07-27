@@ -13,14 +13,24 @@ defmodule MatrixServerWeb.API.CreateRoom do
     field :topic, :string
     field :invite, {:array, :string}
     field :room_version, :string
+    field :preset, :string
     # TODO: unimplemented:
-    # creation_content, initial_state, invite_3pid, initial_state, preset,
+    # creation_content, initial_state, invite_3pid, initial_state,
     # is_direct, power_level_content_override
   end
 
   def changeset(params) do
     %__MODULE__{}
-    |> cast(params, [:visibility, :room_alias_name, :name, :topic, :invite, :room_version])
+    |> cast(params, [
+      :visibility,
+      :room_alias_name,
+      :name,
+      :topic,
+      :invite,
+      :room_version,
+      :preset
+    ])
+    |> validate_inclusion(:preset, ["private_chat", "public_chat", "trusted_private_chat"])
   end
 
   def get_error(%Changeset{errors: [error | _]}), do: get_error(error)
