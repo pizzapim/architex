@@ -3,71 +3,102 @@ defmodule MatrixServer.RoomServer do
 
   import Ecto.Query
 
-  alias MatrixServer.{Repo, Room, Event, Account, StateResolution}
+  alias MatrixServer.{Repo, Room, Event, StateResolution}
   alias MatrixServerWeb.API.CreateRoom
+  alias MatrixServer.StateResolution.Authorization
 
   @registry MatrixServer.RoomServer.Registry
   @supervisor MatrixServer.RoomServer.Supervisor
 
-  def create_room(input, account) do
-    %Room{id: room_id} = room = Repo.insert!(Room.create_changeset(input))
-
-    opts = [
-      name: {:via, Registry, {@registry, room_id}},
-      input: input,
-      account: account,
-      room: room
-    ]
-
-    DynamicSupervisor.start_child(@supervisor, {__MODULE__, opts})
-  end
+  ### Interface
 
   def start_link(opts) do
     {name, opts} = Keyword.pop(opts, :name)
     GenServer.start_link(__MODULE__, opts, name: name)
   end
 
+  # Get room server pid, or spin one up for the room.
+  # If the room does not exist, return an error.
+  def get_room_server(room_id) do
+    case Repo.one(from r in Room, where: r.id == ^room_id) do
+      nil ->
+        {:error, :not_found}
+
+      %Room{} ->
+        case Registry.lookup(@registry, room_id) do
+          [{pid, _}] ->
+            {:ok, pid}
+
+          [] ->
+            opts = [
+              name: {:via, Registry, {@registry, room_id}},
+              room_id: room_id
+            ]
+
+            DynamicSupervisor.start_child(@supervisor, {__MODULE__, opts})
+        end
+    end
+  end
+
+  def create_room(pid, account, input) do
+    GenServer.call(pid, {:create_room, account, input})
+  end
+
+  ### Implementation
+
   @impl true
   def init(opts) do
-    room = Keyword.fetch!(opts, :room)
-    input = Keyword.fetch!(opts, :input)
-    account = Keyword.fetch!(opts, :account)
+    room_id = Keyword.fetch!(opts, :room_id)
 
-    Repo.transaction(fn ->
-      with {:ok, create_room_id, state_set, room} <-
-             room_creation_create_room(account, input, room),
-           {:ok, join_creator_id, state_set, room} <-
-             room_creation_join_creator(account, room, state_set, [create_room_id]),
-           {:ok, pl_id, state_set, room} <-
-             room_creation_power_levels(
-               account,
-               room,
-               state_set,
-               [create_room_id, join_creator_id]
-             ),
-           {:ok, _, state_set, room} <-
-             room_creation_preset(account, input, room, state_set, [
-               create_room_id,
-               join_creator_id,
-               pl_id
-             ]),
-           {:ok, _, state_set, room} <-
-             room_creation_name(account, input, room, state_set, [
-               create_room_id,
-               join_creator_id,
-               pl_id
-             ]),
-           {:ok, _, state_set, room} <-
-             room_creation_topic(account, input, room, state_set, [
-               create_room_id,
-               join_creator_id,
-               pl_id
-             ]) do
-        {:ok, %{room: room, state_set: state_set}}
-      else
-        _ -> {:error, :validation}
-      end
-    end)
+    {:ok, %{room_id: room_id, state_set: %{}}}
+  end
+
+  @impl true
+  def handle_call({:create_room, account, input}, _from, %{room_id: room_id} = state) do
+    result =
+      Repo.transaction(fn ->
+        # TODO: power_level_content_override, initial_state, invite, invite_3pid
+        with room <- Repo.one!(from r in Room, where: r.id == ^room_id),
+             {:ok, create_room_id, state_set, room} <-
+               room_creation_create_room(account, input, room),
+             {:ok, join_creator_id, state_set, room} <-
+               room_creation_join_creator(account, room, state_set, [create_room_id]),
+             {:ok, pl_id, state_set, room} <-
+               room_creation_power_levels(
+                 account,
+                 room,
+                 state_set,
+                 [create_room_id, join_creator_id]
+               ),
+             {:ok, _, state_set, room} <-
+               room_creation_preset(account, input, room, state_set, [
+                 create_room_id,
+                 join_creator_id,
+                 pl_id
+               ]),
+             {:ok, _, state_set, room} <-
+               room_creation_name(account, input, room, state_set, [
+                 create_room_id,
+                 join_creator_id,
+                 pl_id
+               ]),
+             {:ok, _, state_set, _} <-
+               room_creation_topic(account, input, room, state_set, [
+                 create_room_id,
+                 join_creator_id,
+                 pl_id
+               ]) do
+          state_set
+        else
+          reason ->
+            Repo.rollback(reason)
+        end
+      end)
+
+    case result do
+      {:ok, state_set} -> {:reply, :ok, %{state | state_set: state_set}}
+      {:error, reason} -> {:reply, {:error, reason}, state}
+    end
   end
 
   defp room_creation_create_room(account, %CreateRoom{room_version: room_version}, room) do
@@ -177,11 +208,11 @@ defmodule MatrixServer.RoomServer do
     event = %Event{event | prev_events: forward_extremities}
 
     if Event.prevalidate(event) do
-      if StateResolution.is_authorized_by_auth_events(event) do
+      if Authorization.authorized_by_auth_events?(event) do
         state_set = StateResolution.resolve(event, false)
 
-        if StateResolution.is_authorized(event, state_set) do
-          if StateResolution.is_authorized(event, current_state_set) do
+        if Authorization.authorized?(event, state_set) do
+          if Authorization.authorized?(event, current_state_set) do
             # We assume here that the event is always a forward extremity.
             room = Room.update_forward_extremities(event, room)
             {:ok, event} = Repo.insert(event)
@@ -199,10 +230,5 @@ defmodule MatrixServer.RoomServer do
     else
       {:error, :invalid}
     end
-  end
-
-  def testing do
-    account = Repo.one!(from a in Account, limit: 1)
-    create_room(%CreateRoom{name: "Sneed", topic: "City slickers"}, account)
   end
 end
