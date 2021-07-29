@@ -114,8 +114,9 @@ defmodule MatrixServer.RoomServer do
       end)
 
     case result do
-      {:ok, state_set} -> {:reply, :ok, %{state | state_set: state_set}}
+      {:ok, state_set} -> {:reply, {:ok, room_id}, %{state | state_set: state_set}}
       {:error, reason} -> {:reply, {:error, reason}, state}
+      _ -> {:reply, {:error, :unknown}, state}
     end
   end
 
@@ -160,28 +161,17 @@ defmodule MatrixServer.RoomServer do
     # 6. Passes authorization rules based on the current state of the room, otherwise it is "soft failed".
     event = %Event{event | prev_events: forward_extremities}
 
-    if Event.prevalidate(event) do
-      if Authorization.authorized_by_auth_events?(event) do
-        state_set = StateResolution.resolve(event, false)
-
-        if Authorization.authorized?(event, state_set) do
-          if Authorization.authorized?(event, current_state_set) do
-            # We assume here that the event is always a forward extremity.
-            room = Room.update_forward_extremities(event, room)
-            event = Repo.insert!(event)
-            state_set = StateResolution.resolve_forward_extremities(event)
-            {:ok, state_set, room}
-          else
-            {:error, :soft_failed}
-          end
-        else
-          {:error, :rejected}
-        end
-      else
-        {:error, :rejected}
-      end
+    with true <- Event.prevalidate(event),
+         true <- Authorization.authorized_by_auth_events?(event),
+         state_set <- StateResolution.resolve(event, false),
+         true <- Authorization.authorized?(event, state_set),
+         true <- Authorization.authorized?(event, current_state_set) do
+      room = Room.update_forward_extremities(event, room)
+      event = Repo.insert!(event)
+      state_set = StateResolution.resolve_forward_extremities(event)
+      {:ok, state_set, room}
     else
-      {:error, :invalid}
+      _ -> {:error, :authorization}
     end
   end
 end

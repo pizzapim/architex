@@ -9,13 +9,15 @@ defmodule MatrixServerWeb.Plug.Error do
     forbidden: {400, "M_FORBIDDEN", "The requested action is forbidden."},
     unrecognized: {400, "M_UNRECOGNIZED", "Unrecognized request."},
     unknown: {400, "M_UNKNOWN", "An unknown error occurred."},
+    invalid_room_state:
+      {400, "M_INVALID_ROOM_STATE", "The request would result in and invalid room state."},
     unknown_token: {401, "M_UNKNOWN_TOKEN", "Invalid access token."},
     missing_token: {401, "M_MISSING_TOKEN", "Access token required."}
   }
 
   def put_error(conn, error, msg \\ nil) do
     {status, errcode, default_msg} = @error_map[error]
-    data = %{errcode: errcode, error: msg or default_msg}
+    data = %{errcode: errcode, error: msg || default_msg}
 
     conn
     |> put_status(status)

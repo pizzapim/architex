@@ -4,7 +4,7 @@ defmodule MatrixServerWeb.RoomController do
   import MatrixServerWeb.Plug.Error
   import Ecto.Changeset
 
-  alias MatrixServer.{Repo, Room, RoomServer}
+  alias MatrixServer.Room
   alias MatrixServerWeb.API.{CreateRoom}
   alias Ecto.Changeset
   alias Plug.Conn
@@ -14,15 +14,18 @@ defmodule MatrixServerWeb.RoomController do
       %Changeset{valid?: true} = cs ->
         input = apply_changes(cs)
 
-        # TODO: refactor
-        # Room.create(account, input)
-        # %Room{id: room_id} = Repo.insert!(Room.create_changeset(input))
-        # {:ok, pid} = RoomServer.get_room_server(room_id)
-        # RoomServer.create_room(pid, account, input)
+        case Room.create(account, input) do
+          {:ok, room_id} ->
+            conn
+            |> put_status(200)
+            |> json(%{room_id: room_id})
 
-        conn
-        |> put_status(200)
-        |> json(%{})
+          {:error, :authorization} ->
+            put_error(conn, :invalid_room_state)
+
+          {:error, :unknown} ->
+            put_error(conn, :unknown)
+        end
 
       _ ->
         put_error(conn, :bad_json)

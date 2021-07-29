@@ -4,7 +4,7 @@ defmodule MatrixServer.Room do
   import Ecto.Changeset
   import Ecto.Query
 
-  alias MatrixServer.{Repo, Room, Event}
+  alias MatrixServer.{Repo, Room, Event, RoomServer}
   alias MatrixServerWeb.API.CreateRoom
 
   @primary_key {:id, :string, []}
@@ -39,10 +39,20 @@ defmodule MatrixServer.Room do
       ) do
     new_forward_extremities = [event_id | forward_extremities -- prev_event_ids]
 
+    # TODO: might not need to save to DB here.
     {_, [room]} =
       from(r in Room, where: r.id == ^room_id, select: r)
       |> Repo.update_all(set: [forward_extremities: new_forward_extremities])
 
     room
+  end
+
+  def create(account, input) do
+    with {:ok, %Room{id: room_id}} <- Repo.insert(create_changeset(input)),
+         {:ok, pid} <- RoomServer.get_room_server(room_id) do
+      RoomServer.create_room(pid, account, input)
+    else
+      _ -> {:error, :unknown}
+    end
   end
 end
