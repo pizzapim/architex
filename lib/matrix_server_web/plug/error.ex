@@ -2,7 +2,7 @@ defmodule MatrixServerWeb.Plug.Error do
   import Plug.Conn
   import Phoenix.Controller, only: [json: 2]
 
-  @error_code_and_message %{
+  @error_map %{
     bad_json: {400, "M_BAD_JSON", "Bad request."},
     user_in_use: {400, "M_USER_IN_USE", "Username is already taken."},
     invalid_username: {400, "M_INVALID_USERNAME", "Invalid username."},
@@ -13,9 +13,9 @@ defmodule MatrixServerWeb.Plug.Error do
     missing_token: {401, "M_MISSING_TOKEN", "Access token required."}
   }
 
-  def put_error(conn, error) do
-    {status, errcode, errmsg} = @error_code_and_message[error]
-    data = %{errcode: errcode, error: errmsg}
+  def put_error(conn, error, msg \\ nil) do
+    {status, errcode, default_msg} = @error_map[error]
+    data = %{errcode: errcode, error: msg or default_msg}
 
     conn
     |> put_status(status)

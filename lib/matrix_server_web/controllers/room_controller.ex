@@ -15,9 +15,10 @@ defmodule MatrixServerWeb.RoomController do
         input = apply_changes(cs)
 
         # TODO: refactor
-        %Room{id: room_id} = Repo.insert!(Room.create_changeset(input))
-        {:ok, pid} = RoomServer.get_room_server(room_id)
-        RoomServer.create_room(pid, account, input)
+        # Room.create(account, input)
+        # %Room{id: room_id} = Repo.insert!(Room.create_changeset(input))
+        # {:ok, pid} = RoomServer.get_room_server(room_id)
+        # RoomServer.create_room(pid, account, input)
 
         conn
         |> put_status(200)

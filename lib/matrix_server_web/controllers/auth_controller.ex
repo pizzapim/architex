@@ -44,7 +44,7 @@ defmodule MatrixServerWeb.AuthController do
 
   def register(conn, %{"auth" => _}) do
     # Other login types are unsupported for now.
-    put_error(conn, :forbidden)
+    put_error(conn, :unrecognized, "Only m.login.dummy is supported currently.")
   end
 
   def register(conn, _params) do
@@ -87,8 +87,11 @@ defmodule MatrixServerWeb.AuthController do
             |> put_status(200)
             |> json(data)
 
-          {:error, error} ->
+          {:error, error} when is_atom(error) ->
             put_error(conn, error)
+
+          {:error, _} ->
+            put_error(conn, :unknown)
         end
 
       _ ->
@@ -98,6 +101,6 @@ defmodule MatrixServerWeb.AuthController do
 
   def login(conn, _params) do
     # Other login types and identifiers are unsupported for now.
-    put_error(conn, :unknown)
+    put_error(conn, :unrecognized, "Only m.login.password is supported currently.")
   end
 end

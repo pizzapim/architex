@@ -264,9 +264,9 @@ defmodule MatrixServer.StateResolution do
   end
 
   def update_state_set(
-         %Event{type: event_type, state_key: state_key} = event,
-         state_set
-       ) do
+        %Event{type: event_type, state_key: state_key} = event,
+        state_set
+      ) do
     Map.put(state_set, {event_type, state_key}, event)
   end
 

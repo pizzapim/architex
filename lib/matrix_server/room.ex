@@ -10,7 +10,7 @@ defmodule MatrixServer.Room do
   @primary_key {:id, :string, []}
   schema "rooms" do
     field :visibility, Ecto.Enum, values: [:public, :private]
-    field :state, :map
+    field :state, {:array, {:array, :string}}
     field :forward_extremities, {:array, :string}
     has_many :events, Event, foreign_key: :event_id
   end
@@ -22,7 +22,7 @@ defmodule MatrixServer.Room do
   def create_changeset(%CreateRoom{} = input) do
     visibility = input.visibility || :public
 
-    %Room{id: generate_room_id(), forward_extremities: [], state: %{}}
+    %Room{id: generate_room_id()}
     |> changeset(%{visibility: visibility})
   end
 

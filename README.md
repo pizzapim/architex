@@ -6,6 +6,7 @@ Currently it is in a very early stage.
 Some noteworthy contributions:
 
 * `lib/matrix_server/state_resolution.ex`: Implementation of version 2 of the Matrix state resolution algorithm.
+* `lib/matrix_server/state_resolution/authorization.ex`: Implementation of authorization rules for the state resolution algorithm.
 * `lib/matrix_server/room_server.ex`: A GenServer that holds and manages the state of a room.
 
 To run the server in development mode, run:

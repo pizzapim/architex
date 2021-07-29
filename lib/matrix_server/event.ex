@@ -28,7 +28,7 @@ defmodule MatrixServer.Event do
     }
   end
 
-  def create_room(room, %Account{localpart: localpart} = creator, room_version) do
+  def create_room(room, %Account{localpart: localpart} = creator, room_version, auth_events \\ []) do
     mxid = MatrixServer.get_mxid(localpart)
 
     %Event{
@@ -38,11 +38,12 @@ defmodule MatrixServer.Event do
         content: %{
           "creator" => mxid,
           "room_version" => room_version || MatrixServer.default_room_version()
-        }
+        },
+        auth_events: auth_events
     }
   end
 
-  def join(room, %Account{localpart: localpart} = sender) do
+  def join(room, %Account{localpart: localpart} = sender, auth_events \\ []) do
     mxid = MatrixServer.get_mxid(localpart)
 
     %Event{
@@ -51,11 +52,12 @@ defmodule MatrixServer.Event do
         state_key: mxid,
         content: %{
           "membership" => "join"
-        }
+        },
+        auth_events: auth_events
     }
   end
 
-  def power_levels(room, %Account{localpart: localpart} = sender) do
+  def power_levels(room, %Account{localpart: localpart} = sender, auth_events \\ []) do
     mxid = MatrixServer.get_mxid(localpart)
 
     %Event{
@@ -77,62 +79,68 @@ defmodule MatrixServer.Event do
           "notifications" => %{
             "room" => 50
           }
-        }
+        },
+        auth_events: auth_events
     }
   end
 
-  def name(room, sender, name) do
+  def name(room, sender, name, auth_events \\ []) do
     %Event{
       new(room, sender)
       | type: "m.room.name",
         state_key: "",
         content: %{
           "name" => name
-        }
+        },
+        auth_events: auth_events
     }
   end
 
-  def topic(room, sender, topic) do
+  def topic(room, sender, topic, auth_events \\ []) do
     %Event{
       new(room, sender)
       | type: "m.room.topic",
         state_key: "",
         content: %{
           "topic" => topic
-        }
+        },
+        auth_events: auth_events
     }
   end
 
-  def join_rules(room, sender, join_rule) do
+  def join_rules(room, sender, join_rule, auth_events \\ []) do
     %Event{
       new(room, sender)
       | type: "m.room.join_rules",
         state_key: "",
         content: %{
           "join_rule" => join_rule
-        }
+        },
+        auth_events: auth_events
     }
   end
 
-  def history_visibility(room, sender, history_visibility) do
+  def history_visibility(room, sender, history_visibility, auth_events \\ []) do
     %Event{
       new(room, sender)
       | type: "m.room.history_visibility",
         state_key: "",
         content: %{
           "history_visibility" => history_visibility
-        }
+        },
+        auth_events: auth_events
     }
   end
 
-  def guest_access(room, sender, guest_access) do
+  def guest_access(room, sender, guest_access, auth_events \\ []) do
     %Event{
       new(room, sender)
       | type: "m.room.guest_access",
         state_key: "",
         content: %{
           "guest_access" => guest_access
-        }
+        },
+        auth_events: auth_events
     }
   end
 
