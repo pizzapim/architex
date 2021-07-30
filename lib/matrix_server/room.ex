@@ -4,7 +4,7 @@ defmodule MatrixServer.Room do
   import Ecto.Changeset
   import Ecto.Query
 
-  alias MatrixServer.{Repo, Room, Event, RoomServer}
+  alias MatrixServer.{Repo, Room, Event, Alias, RoomServer}
   alias MatrixServerWeb.API.CreateRoom
 
   @primary_key {:id, :string, []}
@@ -13,6 +13,7 @@ defmodule MatrixServer.Room do
     field :state, {:array, {:array, :string}}
     field :forward_extremities, {:array, :string}
     has_many :events, Event, foreign_key: :event_id
+    has_many :aliases, Alias, foreign_key: :room_id
   end
 
   def changeset(room, params \\ %{}) do

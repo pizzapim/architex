@@ -10,10 +10,14 @@ defmodule MatrixServerWeb.Plug.Error do
     unrecognized: {400, "M_UNRECOGNIZED", "Unrecognized request."},
     unknown: {400, "M_UNKNOWN", "An unknown error occurred."},
     invalid_room_state:
-      {400, "M_INVALID_ROOM_STATE", "The request would result in and invalid room state."},
+      {400, "M_INVALID_ROOM_STATE", "The request would leave the room in an invalid state."},
     unknown_token: {401, "M_UNKNOWN_TOKEN", "Invalid access token."},
-    missing_token: {401, "M_MISSING_TOKEN", "Access token required."}
+    missing_token: {401, "M_MISSING_TOKEN", "Access token required."},
+    not_found: {404, "M_NOT_FOUND", "The requested resource was not found."},
+    room_alias_exists: {409, "M.UNKNOWN", "The given room alias already exists."}
   }
+
+  def put_error(conn, {error, msg}), do: put_error(conn, error, msg)
 
   def put_error(conn, error, msg \\ nil) do
     {status, errcode, default_msg} = @error_map[error]

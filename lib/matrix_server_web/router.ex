@@ -33,6 +33,10 @@ defmodule MatrixServerWeb.Router do
       post "/logout", AccountController, :logout
       post "/logout/all", AccountController, :logout_all
       post "/createRoom", RoomController, :create
+
+      scope "/directory/room" do
+        put "/:alias", AliasesController, :create
+      end
     end
   end
 
