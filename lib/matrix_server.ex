@@ -47,4 +47,11 @@ defmodule MatrixServer do
     end)
     |> is_boolean()
   end
+
+  # https://matrix.org/docs/spec/appendices#unpadded-base64
+  def unpadded_base64(data) do
+    data
+    |> Base.encode64()
+    |> String.trim_trailing("=")
+  end
 end

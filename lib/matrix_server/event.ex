@@ -3,8 +3,9 @@ defmodule MatrixServer.Event do
 
   import Ecto.Query
 
-  alias MatrixServer.{Repo, Room, Event, Account}
+  alias MatrixServer.{Repo, Room, Event, Account, OrderedMap}
 
+  @schema_meta_fields [:__meta__]
   @primary_key {:event_id, :string, []}
   schema "events" do
     field :type, :string
@@ -267,5 +268,77 @@ defmodule MatrixServer.Event do
           false
         end
     end)
+  end
+
+  def calculate_content_hash(event) do
+    result =
+      event
+      |> to_map()
+      |> Map.drop([:unsigned, :signature, :hashes])
+      |> OrderedMap.from_map()
+      |> Jason.encode()
+
+    case result do
+      {:ok, json} ->
+        :crypto.hash(:sha256, json)
+        |> MatrixServer.unpadded_base64()
+
+      error ->
+        error
+    end
+  end
+
+  def redact(%Event{type: type, content: content} = event) do
+    redacted_event =
+      event
+      |> to_map()
+      |> Map.take([
+        :event_id,
+        :type,
+        :room_id,
+        :sender,
+        :state_key,
+        :content,
+        :hashes,
+        :signatures,
+        :depth,
+        :prev_events,
+        :prev_state,
+        :auth_events,
+        :origin,
+        :origin_server_ts,
+        :membership
+      ])
+
+    %{redacted_event | content: redact_content(type, content)}
+  end
+
+  defp redact_content("m.room.member", content), do: Map.take(["membership"])
+  defp redact_content("m.room.create", content), do: Map.take(["creator"])
+  defp redact_content("m.room.join_rules", content), do: Map.take(["join_rule"])
+  defp redact_content("m.room.aliases", content), do: Map.take(["aliases"])
+  defp redact_content("m.room.history_visibility", content), do: Map.take(["history_visibility"])
+
+  defp redact_content("m.room.power_levels", content),
+    do:
+      Map.take([
+        "ban",
+        "events",
+        "events_default",
+        "kick",
+        "redact",
+        "state_default",
+        "users",
+        "users_default"
+      ])
+
+  # https://stackoverflow.com/questions/41523762/41671211
+  def to_map(event) do
+    association_fields = event.__struct__.__schema__(:associations)
+    waste_fields = association_fields ++ @schema_meta_fields
+
+    event
+    |> Map.from_struct()
+    |> Map.drop(waste_fields)
   end
 end
