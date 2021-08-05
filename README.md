@@ -9,7 +9,7 @@ Some noteworthy contributions:
 * `lib/matrix_server/state_resolution/authorization.ex`: Implementation of authorization rules for the state resolution algorithm.
 * `lib/matrix_server/room_server.ex`: A GenServer that holds and manages the state of a room.
 
-Generate the server's ed25510 keys by executing `ssh-keygen -t ed25519 -f keys/id_ed25519 -N ""`
+Generate the server's ed25519 keys by executing `ssh-keygen -t ed25519 -f keys/id_ed25519 -N ""`
 
 Dependencies:
 
