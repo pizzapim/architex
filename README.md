@@ -9,9 +9,11 @@ Some noteworthy contributions:
 * `lib/matrix_server/state_resolution/authorization.ex`: Implementation of authorization rules for the state resolution algorithm.
 * `lib/matrix_server/room_server.ex`: A GenServer that holds and manages the state of a room.
 
-To run the server in development mode, run:
+Generate the server's ed25510 keys by executing `ssh-keygen -t ed25519 -f keys/id_ed25519 -N ""`
 
-* Install the latest Erlang, Elixir and Postgresql.
-* Create the database with name `matrix_server_dev` and credentials `matrix_server:matrix_server`.
-* Fetch Elixir dependencies with `mix deps.get`.
-* Run the server using `mix phx.server`.
+Dependencies:
+
+* Elixir 1.12.2 compiled for OTP 24
+* Erlang 24.0.3
+* PostgreSQL
+* Libsodium

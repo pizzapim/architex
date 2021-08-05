@@ -3,7 +3,7 @@ defmodule MatrixServer.Event do
 
   import Ecto.Query
 
-  alias MatrixServer.{Repo, Room, Event, Account, OrderedMap}
+  alias MatrixServer.{Repo, Room, Event, Account, OrderedMap, SigningServer}
 
   @schema_meta_fields [:__meta__]
   @primary_key {:event_id, :string, []}
@@ -15,6 +15,11 @@ defmodule MatrixServer.Event do
     field :content, :map
     field :prev_events, {:array, :string}
     field :auth_events, {:array, :string}
+    # TODO: make these database fields eventually?
+    field :signing_keys, :map, virtual: true, default: %{}
+    field :unsigned, :map, virtual: true, default: %{}
+    field :signatures, :map, virtual: true, default: %{}
+    field :hashes, :map, virtual: true, default: %{}
     belongs_to :room, Room, type: :string
   end
 
@@ -270,7 +275,16 @@ defmodule MatrixServer.Event do
     end)
   end
 
-  def calculate_content_hash(event) do
+  def sign(event) do
+    content_hash = calculate_content_hash(event)
+
+    event
+    |> Map.put(:hashes, %{"sha256" => content_hash})
+    |> redact()
+    |> SigningServer.sign_event()
+  end
+
+  defp calculate_content_hash(event) do
     result =
       event
       |> to_map()
@@ -281,14 +295,14 @@ defmodule MatrixServer.Event do
     case result do
       {:ok, json} ->
         :crypto.hash(:sha256, json)
-        |> MatrixServer.unpadded_base64()
+        |> MatrixServer.encode_unpadded_base64()
 
       error ->
         error
     end
   end
 
-  def redact(%Event{type: type, content: content} = event) do
+  defp redact(%Event{type: type, content: content} = event) do
     redacted_event =
       event
       |> to_map()
@@ -313,15 +327,17 @@ defmodule MatrixServer.Event do
     %{redacted_event | content: redact_content(type, content)}
   end
 
-  defp redact_content("m.room.member", content), do: Map.take(["membership"])
-  defp redact_content("m.room.create", content), do: Map.take(["creator"])
-  defp redact_content("m.room.join_rules", content), do: Map.take(["join_rule"])
-  defp redact_content("m.room.aliases", content), do: Map.take(["aliases"])
-  defp redact_content("m.room.history_visibility", content), do: Map.take(["history_visibility"])
+  defp redact_content("m.room.member", content), do: Map.take(content, ["membership"])
+  defp redact_content("m.room.create", content), do: Map.take(content, ["creator"])
+  defp redact_content("m.room.join_rules", content), do: Map.take(content, ["join_rule"])
+  defp redact_content("m.room.aliases", content), do: Map.take(content, ["aliases"])
+
+  defp redact_content("m.room.history_visibility", content),
+    do: Map.take(content, ["history_visibility"])
 
   defp redact_content("m.room.power_levels", content),
     do:
-      Map.take([
+      Map.take(content, [
         "ban",
         "events",
         "events_default",

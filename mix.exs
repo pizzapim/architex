@@ -43,7 +43,8 @@ defmodule MatrixServer.MixProject do
       {:plug_cowboy, "~> 2.0"},
       {:bcrypt_elixir, "~> 2.3"},
       {:cors_plug, "~> 2.0"},
-      {:ex_machina, "~> 2.7", only: :test}
+      {:ex_machina, "~> 2.7", only: :test},
+      {:enacl, "~> 1.2"}
     ]
   end
 
