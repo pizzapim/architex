@@ -22,6 +22,10 @@ defmodule MatrixServerWeb.Router do
       post "/login", AuthController, :login
     end
 
+    scope "/key/v2" do
+      get "/server", KeyController, :get_signing_keys
+    end
+
     get "/client/versions", InfoController, :versions
   end
 

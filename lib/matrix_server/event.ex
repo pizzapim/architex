@@ -28,7 +28,7 @@ defmodule MatrixServer.Event do
       room_id: room_id,
       sender: MatrixServer.get_mxid(localpart),
       event_id: generate_event_id(),
-      origin_server_ts: DateTime.utc_now() |> DateTime.to_unix(),
+      origin_server_ts: System.os_time(:millisecond),
       prev_events: [],
       auth_events: []
     }
@@ -281,7 +281,7 @@ defmodule MatrixServer.Event do
     event
     |> Map.put(:hashes, %{"sha256" => content_hash})
     |> redact()
-    |> SigningServer.sign_event()
+    |> SigningServer.sign_object()
   end
 
   defp calculate_content_hash(event) do

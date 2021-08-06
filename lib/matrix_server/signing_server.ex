@@ -12,8 +12,12 @@ defmodule MatrixServer.SigningServer do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
 
-  def sign_event(event) do
-    GenServer.call(__MODULE__, {:sign_event, event})
+  def sign_object(object) do
+    GenServer.call(__MODULE__, {:sign_object, object})
+  end
+
+  def get_signing_keys do
+    GenServer.call(__MODULE__, :get_signing_keys)
   end
 
   ## Implementation
@@ -27,12 +31,12 @@ defmodule MatrixServer.SigningServer do
   # https://blog.swwomm.com/2020/09/elixir-ed25519-signatures-with-enacl.html
   @impl true
   def handle_call(
-        {:sign_event, event},
+        {:sign_object, object},
         _from,
         %{private_key: private_key} = state
       ) do
     ordered_map =
-      event
+      object
       |> Map.drop([:signatures, :unsigned])
       |> OrderedMap.from_map()
 
@@ -46,16 +50,22 @@ defmodule MatrixServer.SigningServer do
         signature_map = %{@signing_key_id => signature}
         servername = MatrixServer.server_name()
 
-        event =
-          Map.update(event, :signatures, %{servername => signature_map}, fn signatures ->
+        signed_object =
+          Map.update(object, :signatures, %{servername => signature_map}, fn signatures ->
             Map.put(signatures, servername, signature_map)
           end)
 
-        {:reply, event, state}
+        {:reply, {:ok, signed_object}, state}
 
       {:error, _msg} ->
         {:reply, {:error, :json_encode}, state}
     end
+  end
+
+  def handle_call(:get_signing_keys, _from, %{public_key: public_key} = state) do
+    encoded_public_key = MatrixServer.encode_unpadded_base64(public_key)
+
+    {:reply, [{@signing_key_id, encoded_public_key}], state}
   end
 
   # TODO: not sure if there is a better way to do this...
