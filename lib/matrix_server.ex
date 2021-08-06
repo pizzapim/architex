@@ -33,7 +33,7 @@ defmodule MatrixServer do
   def default_room_version, do: "7"
 
   def get_domain(id) do
-    case String.split(id, ":") do
+    case String.split(id, ":", parts: 2) do
       [_, server_name] -> server_name
       _ -> nil
     end

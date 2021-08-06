@@ -44,7 +44,9 @@ defmodule MatrixServer.MixProject do
       {:bcrypt_elixir, "~> 2.3"},
       {:cors_plug, "~> 2.0"},
       {:ex_machina, "~> 2.7", only: :test},
-      {:enacl, "~> 1.2"}
+      {:enacl, "~> 1.2"},
+      {:tesla, "~> 1.4"},
+      {:finch, "~> 0.8.1"}
     ]
   end
 

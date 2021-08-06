@@ -13,7 +13,8 @@ defmodule MatrixServer.Application do
       MatrixServerWeb.Endpoint,
       {Registry, keys: :unique, name: MatrixServer.RoomServer.Registry},
       {DynamicSupervisor, name: MatrixServer.RoomServer.Supervisor, strategy: :one_for_one},
-      MatrixServer.SigningServer
+      MatrixServer.SigningServer,
+      {Finch, name: MatrixServerWeb.HTTPClient}
     ]
 
     Supervisor.start_link(children, name: MatrixServer.Supervisor, strategy: :one_for_one)

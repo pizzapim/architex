@@ -102,7 +102,7 @@ defmodule MatrixServer.Account do
   end
 
   defp try_get_localpart("@" <> rest = user_id) do
-    case String.split(rest, ":") do
+    case String.split(rest, ":", parts: 2) do
       [localpart, _] -> localpart
       _ -> user_id
     end

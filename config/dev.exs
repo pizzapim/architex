@@ -1,5 +1,8 @@
 use Mix.Config
 
+hostname = "localhost"
+port = System.get_env("PORT") || 4000
+
 # Configure your database
 config :matrix_server, MatrixServer.Repo,
   username: "matrix_server",
@@ -16,7 +19,7 @@ config :matrix_server, MatrixServer.Repo,
 # watchers to your application. For example, we use it
 # with webpack to recompile .js and .css sources.
 config :matrix_server, MatrixServerWeb.Endpoint,
-  http: [port: 4000],
+  http: [port: port],
   debug_errors: true,
   code_reloader: true,
   check_origin: false,
@@ -56,5 +59,5 @@ config :phoenix, :stacktrace_depth, 20
 # Initialize plugs at runtime for faster development compilation
 config :phoenix, :plug_init_mode, :runtime
 
-config :matrix_server, server_name: "localhost"
+config :matrix_server, server_name: "#{hostname}:#{port}"
 config :matrix_server, private_key_file: "keys/id_ed25519"
