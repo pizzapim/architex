@@ -1,4 +1,4 @@
-defmodule MatrixServerWeb.AliasesController do
+defmodule MatrixServerWeb.Client.AliasesController do
   use MatrixServerWeb, :controller
 
   import MatrixServerWeb.Plug.Error

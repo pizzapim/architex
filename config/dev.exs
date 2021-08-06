@@ -8,7 +8,7 @@ config :matrix_server, MatrixServer.Repo,
   username: "matrix_server",
   password: "matrix_server",
   database: "matrix_server_dev",
-  hostname: "localhost",
+  hostname: hostname,
   show_sensitive_data_on_connection_error: true,
   pool_size: 10
 

@@ -7,30 +7,37 @@ defmodule MatrixServerWeb.Router do
     plug :accepts, ["json"]
   end
 
-  pipeline :authenticated do
+  pipeline :authenticate_client do
     plug :accepts, ["json"]
     plug Authenticate
+  end
+
+  pipeline :authenticate_server do
+    plug :accepts, ["json"]
+    # TODO: Add plug to verify peer.
   end
 
   scope "/_matrix", MatrixServerWeb do
     pipe_through :public
 
-    scope "/client/r0" do
-      post "/register", AuthController, :register
-      get "/register/available", AccountController, :available
-      get "/login", AuthController, :login_types
-      post "/login", AuthController, :login
+    scope "/client", Client do
+      scope "/r0" do
+        post "/register", RegisterController, :register
+        get "/register/available", AccountController, :available
+        get "/login", LoginController, :login_types
+        post "/login", LoginController, :login
+      end
+
+      get "/versions", InfoController, :versions
     end
 
-    scope "/key/v2" do
+    scope "/key/v2", Federation do
       get "/server", KeyController, :get_signing_keys
     end
-
-    get "/client/versions", InfoController, :versions
   end
 
-  scope "/_matrix", MatrixServerWeb do
-    pipe_through :authenticated
+  scope "/_matrix", MatrixServerWeb.Client do
+    pipe_through :authenticate_client
 
     scope "/client/r0" do
       get "/account/whoami", AccountController, :whoami
@@ -44,7 +51,11 @@ defmodule MatrixServerWeb.Router do
     end
   end
 
-  scope "/", MatrixServerWeb do
+  scope "/_matrix", MatrixServerWeb.Federation do
+
+  end
+
+  scope "/", MatrixServerWeb.Client do
     match :*, "/*path", InfoController, :unrecognized
   end
 end

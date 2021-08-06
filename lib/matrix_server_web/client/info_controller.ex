@@ -1,4 +1,4 @@
-defmodule MatrixServerWeb.InfoController do
+defmodule MatrixServerWeb.Client.InfoController do
   use MatrixServerWeb, :controller
 
   import MatrixServerWeb.Plug.Error

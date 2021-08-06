@@ -1,4 +1,4 @@
-defmodule MatrixServerWeb.AccountController do
+defmodule MatrixServerWeb.Client.AccountController do
   use MatrixServerWeb, :controller
 
   import MatrixServer

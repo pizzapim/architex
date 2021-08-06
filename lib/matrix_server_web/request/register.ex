@@ -1,4 +1,4 @@
-defmodule MatrixServerWeb.API.Register do
+defmodule MatrixServerWeb.Request.Register do
   use Ecto.Schema
 
   import Ecto.Changeset

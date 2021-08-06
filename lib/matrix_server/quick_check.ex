@@ -2,7 +2,7 @@ defmodule MatrixServer.QuickCheck do
   import Ecto.Query
 
   alias MatrixServer.{Repo, Room, Account, RoomServer}
-  alias MatrixServerWeb.API.CreateRoom
+  alias MatrixServerWeb.Request.CreateRoom
 
   def create_room(name \\ nil, topic \\ nil) do
     account = Repo.one!(from a in Account, limit: 1)

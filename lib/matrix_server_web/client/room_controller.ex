@@ -1,11 +1,11 @@
-defmodule MatrixServerWeb.RoomController do
+defmodule MatrixServerWeb.Client.RoomController do
   use MatrixServerWeb, :controller
 
   import MatrixServerWeb.Plug.Error
   import Ecto.Changeset
 
   alias MatrixServer.Room
-  alias MatrixServerWeb.API.{CreateRoom}
+  alias MatrixServerWeb.Request.{CreateRoom}
   alias Ecto.Changeset
   alias Plug.Conn
 
