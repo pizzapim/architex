@@ -1,7 +1,10 @@
 defmodule MatrixServerWeb.Router do
   use MatrixServerWeb, :router
 
-  alias MatrixServerWeb.Plug.Authenticate
+  alias MatrixServerWeb.Plug.AuthenticateClient
+
+  # TODO: might be able to handle malformed JSON with custom body reader:
+  # https://elixirforum.com/t/write-malformed-json-in-the-body-plug/30578/13
 
   pipeline :public do
     plug :accepts, ["json"]
@@ -9,12 +12,11 @@ defmodule MatrixServerWeb.Router do
 
   pipeline :authenticate_client do
     plug :accepts, ["json"]
-    plug Authenticate
+    plug AuthenticateClient
   end
 
   pipeline :authenticate_server do
     plug :accepts, ["json"]
-    # TODO: Add plug to verify peer.
   end
 
   scope "/_matrix", MatrixServerWeb do
@@ -52,7 +54,9 @@ defmodule MatrixServerWeb.Router do
   end
 
   scope "/_matrix", MatrixServerWeb.Federation do
+    pipe_through :authenticate_server
 
+    post "/test", TestController, :test
   end
 
   scope "/", MatrixServerWeb.Client do

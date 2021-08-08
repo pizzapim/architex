@@ -5,7 +5,6 @@ defmodule MatrixServer.Event do
 
   alias MatrixServer.{Repo, Room, Event, Account, OrderedMap, SigningServer}
 
-  @schema_meta_fields [:__meta__]
   @primary_key {:event_id, :string, []}
   schema "events" do
     field :type, :string
@@ -287,7 +286,7 @@ defmodule MatrixServer.Event do
   defp calculate_content_hash(event) do
     result =
       event
-      |> to_map()
+      |> MatrixServer.to_serializable_map()
       |> Map.drop([:unsigned, :signature, :hashes])
       |> OrderedMap.from_map()
       |> Jason.encode()
@@ -305,7 +304,7 @@ defmodule MatrixServer.Event do
   defp redact(%Event{type: type, content: content} = event) do
     redacted_event =
       event
-      |> to_map()
+      |> MatrixServer.to_serializable_map()
       |> Map.take([
         :event_id,
         :type,
@@ -347,14 +346,4 @@ defmodule MatrixServer.Event do
         "users",
         "users_default"
       ])
-
-  # https://stackoverflow.com/questions/41523762/41671211
-  def to_map(event) do
-    association_fields = event.__struct__.__schema__(:associations)
-    waste_fields = association_fields ++ @schema_meta_fields
-
-    event
-    |> Map.from_struct()
-    |> Map.drop(waste_fields)
-  end
 end

@@ -1,8 +1,6 @@
 defmodule MatrixServer.SigningServer do
   use GenServer
 
-  alias MatrixServer.OrderedMap
-
   # TODO: only support one signing key for now.
   @signing_key_id "ed25519:1"
 
@@ -16,8 +14,8 @@ defmodule MatrixServer.SigningServer do
     GenServer.call(__MODULE__, {:sign_object, object})
   end
 
-  def get_signing_keys do
-    GenServer.call(__MODULE__, :get_signing_keys)
+  def get_signing_keys(encoded \\ false) do
+    GenServer.call(__MODULE__, {:get_signing_keys, encoded})
   end
 
   ## Implementation
@@ -35,12 +33,7 @@ defmodule MatrixServer.SigningServer do
         _from,
         %{private_key: private_key} = state
       ) do
-    ordered_map =
-      object
-      |> Map.drop([:signatures, :unsigned])
-      |> OrderedMap.from_map()
-
-    case Jason.encode(ordered_map) do
+    case MatrixServer.encode_canonical_json(object) do
       {:ok, json} ->
         signature =
           json
@@ -62,10 +55,10 @@ defmodule MatrixServer.SigningServer do
     end
   end
 
-  def handle_call(:get_signing_keys, _from, %{public_key: public_key} = state) do
-    encoded_public_key = MatrixServer.encode_unpadded_base64(public_key)
+  def handle_call({:get_signing_keys, encoded}, _from, %{public_key: public_key} = state) do
+    result = if encoded, do: MatrixServer.encode_unpadded_base64(public_key), else: public_key
 
-    {:reply, [{@signing_key_id, encoded_public_key}], state}
+    {:reply, [{@signing_key_id, result}], state}
   end
 
   # TODO: not sure if there is a better way to do this...

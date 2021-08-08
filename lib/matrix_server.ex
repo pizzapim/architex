@@ -1,4 +1,6 @@
 defmodule MatrixServer do
+  alias MatrixServer.OrderedMap
+
   def get_mxid(localpart) when is_binary(localpart) do
     "@#{localpart}:#{server_name()}"
   end
@@ -53,5 +55,29 @@ defmodule MatrixServer do
     data
     |> Base.encode64()
     |> String.trim_trailing("=")
+  end
+
+  # Decode (possibly unpadded) base64.
+  def decode_base64(data) when is_binary(data) do
+    rem = rem(String.length(data), 4)
+    padded_data = if rem > 0, do: data <> String.duplicate("=", 4 - rem), else: data
+    Base.decode64(padded_data)
+  end
+
+  def encode_canonical_json(object) do
+    object
+    |> Map.drop([:signatures, :unsigned])
+    |> OrderedMap.from_map()
+    |> Jason.encode()
+  end
+
+  # https://stackoverflow.com/questions/41523762/41671211
+  def to_serializable_map(struct) do
+    association_fields = struct.__struct__.__schema__(:associations)
+    waste_fields = association_fields ++ [:__meta__]
+
+    struct
+    |> Map.from_struct()
+    |> Map.drop(waste_fields)
   end
 end

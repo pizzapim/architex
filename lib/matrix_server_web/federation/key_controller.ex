@@ -9,7 +9,7 @@ defmodule MatrixServerWeb.Federation.KeyController do
 
   def get_signing_keys(conn, _params) do
     keys =
-      SigningServer.get_signing_keys()
+      SigningServer.get_signing_keys(true)
       |> Enum.into(%{}, fn {key_id, key} ->
         {key_id, %{"key" => key}}
       end)
