@@ -41,6 +41,16 @@ defmodule MatrixServer do
     end
   end
 
+  # TODO Eventually move to regex with named captures.
+  def get_localpart(id) do
+    with [part, _] <- String.split(id, ":", parts: 2),
+         {_, localpart} <- String.split_at(part, 1) do
+      localpart
+    else
+      _ -> nil
+    end
+  end
+
   # https://elixirforum.com/t/22709/9
   def has_duplicates?(list) do
     list

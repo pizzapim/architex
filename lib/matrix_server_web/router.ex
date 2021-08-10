@@ -56,7 +56,7 @@ defmodule MatrixServerWeb.Router do
   scope "/_matrix", MatrixServerWeb.Federation do
     pipe_through :authenticate_server
 
-    post "/test", TestController, :test
+    get "/federation/v1/query/profile", QueryController, :profile
   end
 
   scope "/", MatrixServerWeb.Client do

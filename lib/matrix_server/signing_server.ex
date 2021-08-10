@@ -26,32 +26,11 @@ defmodule MatrixServer.SigningServer do
     {:ok, %{public_key: public_key, private_key: private_key}}
   end
 
-  # https://blog.swwomm.com/2020/09/elixir-ed25519-signatures-with-enacl.html
   @impl true
-  def handle_call(
-        {:sign_object, object},
-        _from,
-        %{private_key: private_key} = state
-      ) do
-    case MatrixServer.encode_canonical_json(object) do
-      {:ok, json} ->
-        signature =
-          json
-          |> :enacl.sign_detached(private_key)
-          |> MatrixServer.encode_unpadded_base64()
-
-        signature_map = %{@signing_key_id => signature}
-        servername = MatrixServer.server_name()
-
-        signed_object =
-          Map.update(object, :signatures, %{servername => signature_map}, fn signatures ->
-            Map.put(signatures, servername, signature_map)
-          end)
-
-        {:reply, {:ok, signed_object}, state}
-
-      {:error, _msg} ->
-        {:reply, {:error, :json_encode}, state}
+  def handle_call({:sign_object, object}, _from, %{private_key: private_key} = state) do
+    case sign_object(object, private_key) do
+      {:ok, signature} -> {:reply, {:ok, signature, @signing_key_id}, state}
+      {:error, _reason} -> {:reply, :error, state}
     end
   end
 
@@ -59,6 +38,18 @@ defmodule MatrixServer.SigningServer do
     result = if encoded, do: MatrixServer.encode_unpadded_base64(public_key), else: public_key
 
     {:reply, [{@signing_key_id, result}], state}
+  end
+
+  # https://blog.swwomm.com/2020/09/elixir-ed25519-signatures-with-enacl.html
+  defp sign_object(object, private_key) do
+    with {:ok, json} <- MatrixServer.encode_canonical_json(object) do
+      signature =
+        json
+        |> :enacl.sign_detached(private_key)
+        |> MatrixServer.encode_unpadded_base64()
+
+      {:ok, signature}
+    end
   end
 
   # TODO: not sure if there is a better way to do this...

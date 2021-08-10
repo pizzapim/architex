@@ -20,26 +20,27 @@ defmodule MatrixServerWeb.FederationClient do
     Tesla.get(client, RouteHelpers.key_path(Endpoint, :get_signing_keys))
   end
 
-  def test_server_auth(client) do
-    origin = "localhost:4001"
-    destination = "localhost:4000"
-    path = RouteHelpers.test_path(Endpoint, :test)
+  # TODO: Create tesla middleware to add signature and headers.
+  def query_profile(client, server_name, user_id, field \\ nil) do
+    origin = MatrixServer.server_name()
+    path = RouteHelpers.query_path(Endpoint, :profile) |> Tesla.build_url(user_id: user_id)
+    path = if field, do: Tesla.build_url(path, field: field), else: path
 
-    params = %{
-      method: "POST",
+    object_to_sign = %{
+      method: "GET",
       uri: path,
       origin: origin,
-      destination: destination,
-      content: %{"hi" => "hello"}
+      destination: server_name
     }
 
-    {:ok, signed_object} = MatrixServer.SigningServer.sign_object(params)
-    auth_headers = create_signature_authorization_headers(signed_object, origin)
+    {:ok, signature, key_id} = MatrixServer.SigningServer.sign_object(object_to_sign)
+    signatures = %{origin => %{key_id => signature}}
+    auth_headers = create_signature_authorization_headers(signatures, origin)
 
-    Tesla.post(client, path, signed_object, headers: auth_headers)
+    Tesla.get(client, path, headers: auth_headers)
   end
 
-  defp create_signature_authorization_headers(%{signatures: signatures}, origin) do
+  defp create_signature_authorization_headers(signatures, origin) do
     Enum.map(signatures[origin], fn {key, sig} ->
       {"Authorization", "X-Matrix origin=#{origin},key=\"#{key}\",sig=\"#{sig}\""}
     end)
