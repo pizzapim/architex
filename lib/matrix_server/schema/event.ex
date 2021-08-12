@@ -3,7 +3,7 @@ defmodule MatrixServer.Event do
 
   import Ecto.Query
 
-  alias MatrixServer.{Repo, Room, Event, Account, OrderedMap, SigningServer}
+  alias MatrixServer.{Repo, Room, Event, Account, OrderedMap, KeyServer}
 
   @primary_key {:event_id, :string, []}
   schema "events" do
@@ -280,7 +280,7 @@ defmodule MatrixServer.Event do
     event
     |> Map.put(:hashes, %{"sha256" => content_hash})
     |> redact()
-    |> SigningServer.sign_object()
+    |> KeyServer.sign_object()
   end
 
   defp calculate_content_hash(event) do

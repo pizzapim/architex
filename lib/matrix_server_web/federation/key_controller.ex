@@ -3,13 +3,13 @@ defmodule MatrixServerWeb.Federation.KeyController do
 
   import MatrixServerWeb.Plug.Error
 
-  alias MatrixServer.SigningServer
+  alias MatrixServer.KeyServer
 
   @key_valid_time_ms 1000 * 60 * 24 * 30
 
   def get_signing_keys(conn, _params) do
     keys =
-      SigningServer.get_signing_keys(true)
+      KeyServer.get_own_signing_keys()
       |> Enum.into(%{}, fn {key_id, key} ->
         {key_id, %{"key" => key}}
       end)
@@ -21,13 +21,15 @@ defmodule MatrixServerWeb.Federation.KeyController do
       valid_until_ts: System.os_time(:millisecond) + @key_valid_time_ms
     }
 
-    case SigningServer.sign_object(data) do
-      {:ok, signed_data} ->
+    case KeyServer.sign_object(data) do
+      {:ok, sig, key_id} ->
+        signed_data = MatrixServer.add_signature(data, key_id, sig)
+
         conn
         |> put_status(200)
         |> json(signed_data)
 
-      {:error, _msg} ->
+      :error ->
         put_error(conn, :unknown, "Error signing object.")
     end
   end

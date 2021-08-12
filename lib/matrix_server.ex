@@ -90,4 +90,23 @@ defmodule MatrixServer do
     |> Map.from_struct()
     |> Map.drop(waste_fields)
   end
+
+  def add_signature(object, key_id, sig) when not is_map_key(object, :signatures) do
+    Map.put(object, :signatures, %{MatrixServer.server_name() => %{key_id => sig}})
+  end
+
+  def add_signature(%{signatures: sigs} = object, key_id, sig) do
+    new_sigs =
+      Map.update(sigs, MatrixServer.server_name(), %{key_id => sig}, &Map.put(&1, key_id, sig))
+
+    %{object | signatures: new_sigs}
+  end
+
+  def validate_change_simple(changeset, field, func) do
+    augmented_func = fn _, val ->
+      if func.(val), do: [], else: [{field, "invalid"}]
+    end
+
+    Ecto.Changeset.validate_change(changeset, field, augmented_func)
+  end
 end

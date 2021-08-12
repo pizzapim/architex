@@ -1,19 +1,17 @@
 defmodule MatrixServerWeb.AuthenticateServer do
   import MatrixServerWeb.Plug.Error
 
-  alias MatrixServer.SigningServer
+  alias MatrixServer.SigningKey
 
   @auth_header_regex ~r/^X-Matrix origin=(?<origin>.*),key="(?<key>.*)",sig="(?<sig>.*)"$/
 
-  def authenticate(
-        %Plug.Conn{
-          body_params: body_params,
-          req_headers: headers,
-          request_path: path,
-          method: method,
-          query_string: query_string
-        }
-      ) do
+  def authenticate(%Plug.Conn{
+        body_params: body_params,
+        req_headers: headers,
+        request_path: path,
+        method: method,
+        query_string: query_string
+      }) do
     object_to_sign = %{
       uri: path <> "?" <> URI.decode_www_form(query_string),
       method: method,
@@ -32,13 +30,16 @@ defmodule MatrixServerWeb.AuthenticateServer do
     headers
     |> parse_authorization_headers()
     |> Enum.find(:error, fn {origin, _, sig} ->
-      # TODO: fetch actual signing keys for origin from cache/key store.
-      {_, signing_key} = SigningServer.get_signing_keys() |> hd()
       object = object_fun.(origin)
 
       with {:ok, raw_sig} <- MatrixServer.decode_base64(sig),
            {:ok, encoded_object} <- MatrixServer.encode_canonical_json(object) do
-        :enacl.sign_verify_detached(raw_sig, encoded_object, signing_key)
+        # TODO: Only query once per origin.
+        # TODO: Handle expired keys.
+        SigningKey.for_server(origin)
+        |> Enum.find_value(false, fn %SigningKey{signing_key: signing_key} ->
+          :enacl.sign_verify_detached(raw_sig, encoded_object, signing_key)
+        end)
       else
         _ -> false
       end
@@ -70,6 +71,7 @@ defmodule MatrixServerWeb.AuthenticateServer do
             {origin, _key, _sig} ->
               conn = Plug.Conn.assign(conn, :origin, origin)
               apply(__MODULE__, action, [conn, conn.params])
+
             :error ->
               put_error(conn, :unauthorized, "Signature verification failed.")
           end

@@ -42,9 +42,7 @@ defmodule MatrixServer.Device do
 
   def generate_device_id(localpart) do
     # TODO: use random string instead
-    time_string = System.os_time(:millisecond) |> Integer.to_string()
-
-    "#{localpart}_#{time_string}"
+    "#{localpart}_#{System.os_time(:millisecond)}"
   end
 
   def login(%Login{} = input, account) do

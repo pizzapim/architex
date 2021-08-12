@@ -2,6 +2,7 @@ defmodule MatrixServerWeb.FederationClient do
   use Tesla
 
   alias MatrixServerWeb.Endpoint
+  alias MatrixServerWeb.Federation.Request.GetSigningKeys
   alias MatrixServerWeb.Router.Helpers, as: RouteHelpers
 
   # TODO: Maybe create database-backed homeserver struct to pass to client function.
@@ -17,7 +18,15 @@ defmodule MatrixServerWeb.FederationClient do
   end
 
   def get_signing_keys(client) do
-    Tesla.get(client, RouteHelpers.key_path(Endpoint, :get_signing_keys))
+    # TODO: Extract into seperate function.
+    # TODO: Check signatures for each verify key.
+    with {:ok, %Tesla.Env{body: body}} <-
+           Tesla.get(client, RouteHelpers.key_path(Endpoint, :get_signing_keys)),
+         %Ecto.Changeset{valid?: true} = cs <- GetSigningKeys.changeset(body) do
+      {:ok, Ecto.Changeset.apply_changes(cs)}
+    else
+      _ -> :error
+    end
   end
 
   # TODO: Create tesla middleware to add signature and headers.
@@ -33,7 +42,7 @@ defmodule MatrixServerWeb.FederationClient do
       destination: server_name
     }
 
-    {:ok, signature, key_id} = MatrixServer.SigningServer.sign_object(object_to_sign)
+    {:ok, signature, key_id} = MatrixServer.KeyServer.sign_object(object_to_sign)
     signatures = %{origin => %{key_id => signature}}
     auth_headers = create_signature_authorization_headers(signatures, origin)
 

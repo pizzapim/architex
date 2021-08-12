@@ -1,4 +1,4 @@
-defmodule MatrixServer.SigningServer do
+defmodule MatrixServer.KeyServer do
   use GenServer
 
   # TODO: only support one signing key for now.
@@ -14,15 +14,15 @@ defmodule MatrixServer.SigningServer do
     GenServer.call(__MODULE__, {:sign_object, object})
   end
 
-  def get_signing_keys(encoded \\ false) do
-    GenServer.call(__MODULE__, {:get_signing_keys, encoded})
+  def get_own_signing_keys() do
+    GenServer.call(__MODULE__, :get_own_signing_keys)
   end
 
   ## Implementation
 
   @impl true
   def init(_opts) do
-    {public_key, private_key} = get_keys()
+    {public_key, private_key} = read_keys()
     {:ok, %{public_key: public_key, private_key: private_key}}
   end
 
@@ -34,10 +34,10 @@ defmodule MatrixServer.SigningServer do
     end
   end
 
-  def handle_call({:get_signing_keys, encoded}, _from, %{public_key: public_key} = state) do
-    result = if encoded, do: MatrixServer.encode_unpadded_base64(public_key), else: public_key
+  def handle_call(:get_own_signing_keys, _from, %{public_key: public_key} = state) do
+    encoded_key = MatrixServer.encode_unpadded_base64(public_key)
 
-    {:reply, [{@signing_key_id, result}], state}
+    {:reply, [{@signing_key_id, encoded_key}], state}
   end
 
   # https://blog.swwomm.com/2020/09/elixir-ed25519-signatures-with-enacl.html
@@ -53,7 +53,7 @@ defmodule MatrixServer.SigningServer do
   end
 
   # TODO: not sure if there is a better way to do this...
-  defp get_keys do
+  def read_keys do
     raw_priv_key =
       Application.get_env(:matrix_server, :private_key_file)
       |> File.read!()
