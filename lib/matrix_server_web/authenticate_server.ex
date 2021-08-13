@@ -1,7 +1,7 @@
 defmodule MatrixServerWeb.AuthenticateServer do
   import MatrixServerWeb.Plug.Error
 
-  alias MatrixServer.SigningKey
+  alias MatrixServer.{SigningKey, ServerKeyInfo}
 
   @auth_header_regex ~r/^X-Matrix origin=(?<origin>.*),key="(?<key>.*)",sig="(?<sig>.*)"$/
 
@@ -27,18 +27,22 @@ defmodule MatrixServerWeb.AuthenticateServer do
   end
 
   defp authenticate_with_headers(headers, object_fun) do
+    # TODO: Only query once per origin.
     headers
     |> parse_authorization_headers()
     |> Enum.find(:error, fn {origin, _, sig} ->
       object = object_fun.(origin)
 
       with {:ok, raw_sig} <- MatrixServer.decode_base64(sig),
-           {:ok, encoded_object} <- MatrixServer.encode_canonical_json(object) do
-        # TODO: Only query once per origin.
-        # TODO: Handle expired keys.
-        SigningKey.for_server(origin)
-        |> Enum.find_value(false, fn %SigningKey{signing_key: signing_key} ->
-          :enacl.sign_verify_detached(raw_sig, encoded_object, signing_key)
+           {:ok, encoded_object} <- MatrixServer.encode_canonical_json(object),
+           {:ok, %ServerKeyInfo{signing_keys: keys}} <-
+             ServerKeyInfo.with_fresh_signing_keys(origin) do
+        Enum.find_value(keys, false, fn %SigningKey{signing_key: signing_key} ->
+          with {:ok, decoded_key} <- MatrixServer.decode_base64(signing_key) do
+            MatrixServer.sign_verify(raw_sig, encoded_object, decoded_key)
+          else
+            _ -> false
+          end
         end)
       else
         _ -> false

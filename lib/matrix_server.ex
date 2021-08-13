@@ -116,4 +116,14 @@ defmodule MatrixServer do
 
     Ecto.Changeset.validate_change(changeset, field, augmented_func)
   end
+
+  # Returns a Boolean whether the signature is valid.
+  # Also returns false on ArgumentError.
+  def sign_verify(sig, text, key) do
+    try do
+      :enacl.sign_verify_detached(sig, text, key)
+    rescue
+      ArgumentError -> false
+    end
+  end
 end

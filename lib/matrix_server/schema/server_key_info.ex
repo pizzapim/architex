@@ -33,10 +33,16 @@ defmodule MatrixServer.ServerKeyInfo do
   end
 
   defp refresh_signing_keys(server_name) do
+    # TODO: Handle expired keys.
     in_a_week = System.os_time(:millisecond) + 1000 * 60 * 60 * 24 * 7
     client = FederationClient.client(server_name)
 
-    with {:ok, %GetSigningKeys{verify_keys: verify_keys, valid_until_ts: valid_until}} <-
+    with {:ok,
+          %GetSigningKeys{
+            server_name: server_name,
+            verify_keys: verify_keys,
+            valid_until_ts: valid_until
+          }} <-
            FederationClient.get_signing_keys(client) do
       signing_keys =
         Enum.map(verify_keys, fn {key_id, %{"key" => key}} ->
@@ -47,7 +53,7 @@ defmodule MatrixServer.ServerKeyInfo do
       ski = %ServerKeyInfo{server_name: server_name, valid_until: min(valid_until, in_a_week)}
 
       case upsert_multi(server_name, ski, signing_keys) |> Repo.transaction() do
-        {:ok, %{ski: ski}} -> {:ok, ski}
+        {:ok, %{new_ski: ski}} -> {:ok, ski}
         {:error, _} -> :error
       end
     else
@@ -63,7 +69,7 @@ defmodule MatrixServer.ServerKeyInfo do
       conflict_target: [:server_name]
     )
     |> Multi.insert_all(:insert_keys, SigningKey, signing_keys, on_conflict: :nothing)
-    |> Multi.run(:ski, fn _, _ ->
+    |> Multi.run(:new_ski, fn _, _ ->
       case with_signing_keys(server_name) do
         nil -> {:error, :ski}
         ski -> {:ok, ski}

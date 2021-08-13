@@ -23,7 +23,7 @@ defmodule MatrixServerWeb.Federation.QueryController do
       |> cast(params, [:user_id, :field])
       |> validate_required([:user_id])
       |> validate_inclusion(:field, ["displayname", "avatar_url"])
-      |> tap(fn
+      |> then(fn
         %Ecto.Changeset{valid?: true} = cs -> {:ok, apply_changes(cs)}
         _ -> :error
       end)
@@ -31,7 +31,7 @@ defmodule MatrixServerWeb.Federation.QueryController do
   end
 
   def profile(conn, params) do
-    with %ProfileRequest{user_id: user_id} <- ProfileRequest.validate(params) do
+    with {:ok, %ProfileRequest{user_id: user_id}} <- ProfileRequest.validate(params) do
       if MatrixServer.get_domain(user_id) == MatrixServer.server_name() do
         localpart = MatrixServer.get_localpart(user_id)
 
@@ -43,10 +43,10 @@ defmodule MatrixServerWeb.Federation.QueryController do
             |> json(%{})
 
           nil ->
-            put_error(:not_found, "User does not exist.")
+            put_error(conn, :not_found, "User does not exist.")
         end
       else
-        put_error(:not_found, "Wrong server name.")
+        put_error(conn, :not_found, "Wrong server name.")
       end
     else
       _ -> put_error(conn, :bad_json)
