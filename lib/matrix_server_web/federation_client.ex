@@ -53,7 +53,7 @@ defmodule MatrixServerWeb.FederationClient do
 
     object_to_sign = %{
       method: "GET",
-      uri: path,
+      uri: URI.decode_www_form(path),
       origin: origin,
       destination: server_name
     }
