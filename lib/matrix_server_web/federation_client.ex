@@ -17,15 +17,39 @@ defmodule MatrixServerWeb.FederationClient do
     Tesla.client([{Tesla.Middleware.BaseUrl, "http://" <> server_name} | @middleware], @adapter)
   end
 
+  @path RouteHelpers.key_path(Endpoint, :get_signing_keys)
   def get_signing_keys(client) do
-    # TODO: Extract into seperate function.
-    # TODO: Check signatures for each verify key.
-    with {:ok, %Tesla.Env{body: body}} <-
-           Tesla.get(client, RouteHelpers.key_path(Endpoint, :get_signing_keys)),
-         %Ecto.Changeset{valid?: true} = cs <- GetSigningKeys.changeset(body) do
-      {:ok, Ecto.Changeset.apply_changes(cs)}
-    else
-      _ -> :error
+    # TODO: Which server_name should we take?
+    # TODO: Should probably catch enacl exceptions and just return error atom,
+    #       create seperate function for this.
+    with {:ok,
+          %GetSigningKeys{server_name: server_name, verify_keys: verify_keys, signatures: sigs} =
+            response} <- tesla_request(:get, client, @path, GetSigningKeys),
+         {:ok, encoded_body} <- MatrixServer.serialize_and_encode(response) do
+      # For each verify key, check if there is a matching signature.
+      # If not, invalidate the whole response.
+      if Map.has_key?(sigs, server_name) do
+        server_sigs = sigs[server_name]
+
+        all_keys_signed? =
+          Enum.all?(verify_keys, fn {key_id, %{"key" => key}} ->
+            with true <- Map.has_key?(server_sigs, key_id),
+                 {:ok, decoded_key} <- MatrixServer.decode_base64(key),
+                 {:ok, decoded_sig} <- MatrixServer.decode_base64(server_sigs[key_id]) do
+              :enacl.sign_verify_detached(decoded_sig, encoded_body, decoded_key)
+            else
+              _ -> false
+            end
+          end)
+
+        if all_keys_signed? do
+          {:ok, response}
+        else
+          :error
+        end
+      else
+        :error
+      end
     end
   end
 
@@ -53,5 +77,14 @@ defmodule MatrixServerWeb.FederationClient do
     Enum.map(signatures[origin], fn {key, sig} ->
       {"Authorization", "X-Matrix origin=#{origin},key=\"#{key}\",sig=\"#{sig}\""}
     end)
+  end
+
+  defp tesla_request(method, client, path, request_schema) do
+    with {:ok, %Tesla.Env{body: body}} <- Tesla.request(client, url: path, method: method),
+         %Ecto.Changeset{valid?: true} = cs <- apply(request_schema, :changeset, [body]) do
+      {:ok, Ecto.Changeset.apply_changes(cs)}
+    else
+      _ -> :error
+    end
   end
 end

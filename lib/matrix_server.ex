@@ -91,6 +91,13 @@ defmodule MatrixServer do
     |> Map.drop(waste_fields)
   end
 
+  def serialize_and_encode(struct) do
+    # TODO: handle nil values in struct?
+    struct
+    |> to_serializable_map()
+    |> encode_canonical_json()
+  end
+
   def add_signature(object, key_id, sig) when not is_map_key(object, :signatures) do
     Map.put(object, :signatures, %{MatrixServer.server_name() => %{key_id => sig}})
   end
