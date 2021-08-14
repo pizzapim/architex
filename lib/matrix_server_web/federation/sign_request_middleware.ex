@@ -12,7 +12,7 @@ defmodule MatrixServerWeb.Federation.Middleware.SignRequest do
 
   defp sign_request(env, false), do: env
 
-  defp sign_request(%Tesla.Env{method: method, url: path, opts: opts} = env, true) do
+  defp sign_request(%Tesla.Env{method: method, url: path, opts: opts, body: body} = env, true) do
     origin = MatrixServer.server_name()
 
     object_to_sign = %{
@@ -21,6 +21,9 @@ defmodule MatrixServerWeb.Federation.Middleware.SignRequest do
       uri: URI.decode_www_form(path),
       destination: Keyword.fetch!(opts, :server_name)
     }
+
+    object_to_sign =
+      if not is_nil(body), do: Map.put(object_to_sign, :content, body), else: object_to_sign
 
     with {:ok, sig, key_id} <- MatrixServer.KeyServer.sign_object(object_to_sign) do
       sigs = %{origin => %{key_id => sig}}
