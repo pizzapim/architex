@@ -1,7 +1,7 @@
 defmodule MatrixServerWeb.Client.InfoController do
   use MatrixServerWeb, :controller
 
-  import MatrixServerWeb.Plug.Error
+  import MatrixServerWeb.Error
 
   @supported_versions ["r0.6.1"]
 

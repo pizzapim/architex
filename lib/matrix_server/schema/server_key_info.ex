@@ -4,7 +4,7 @@ defmodule MatrixServer.ServerKeyInfo do
   import Ecto.Query
 
   alias MatrixServer.{Repo, ServerKeyInfo, SigningKey}
-  alias MatrixServerWeb.FederationClient
+  alias MatrixServerWeb.Federation.HTTPClient
   alias MatrixServerWeb.Federation.Request.GetSigningKeys
   alias Ecto.Multi
 
@@ -35,7 +35,7 @@ defmodule MatrixServer.ServerKeyInfo do
   defp refresh_signing_keys(server_name) do
     # TODO: Handle expired keys.
     in_a_week = System.os_time(:millisecond) + 1000 * 60 * 60 * 24 * 7
-    client = FederationClient.client(server_name)
+    client = HTTPClient.client(server_name)
 
     with {:ok,
           %GetSigningKeys{
@@ -43,7 +43,7 @@ defmodule MatrixServer.ServerKeyInfo do
             verify_keys: verify_keys,
             valid_until_ts: valid_until
           }} <-
-           FederationClient.get_signing_keys(client) do
+           HTTPClient.get_signing_keys(client) do
       signing_keys =
         Enum.map(verify_keys, fn {key_id, %{"key" => key}} ->
           [server_name: server_name, signing_key_id: key_id, signing_key: key]

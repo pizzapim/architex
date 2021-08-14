@@ -1,4 +1,4 @@
-defmodule MatrixServerWeb.Request.CreateRoom do
+defmodule MatrixServerWeb.Client.Request.CreateRoom do
   use Ecto.Schema
 
   import Ecto.Changeset

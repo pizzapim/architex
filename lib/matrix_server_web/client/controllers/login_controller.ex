@@ -1,11 +1,11 @@
 defmodule MatrixServerWeb.Client.LoginController do
   use MatrixServerWeb, :controller
 
-  import MatrixServerWeb.Plug.Error
+  import MatrixServerWeb.Error
   import Ecto.Changeset
 
   alias MatrixServer.{Repo, Account}
-  alias MatrixServerWeb.Request.Login
+  alias MatrixServerWeb.Client.Request.Login
   alias Ecto.Changeset
 
   @login_type "m.login.password"

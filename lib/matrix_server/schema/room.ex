@@ -5,7 +5,7 @@ defmodule MatrixServer.Room do
   import Ecto.Query
 
   alias MatrixServer.{Repo, Room, Event, Alias, RoomServer}
-  alias MatrixServerWeb.Request.CreateRoom
+  alias MatrixServerWeb.Client.Request.CreateRoom
 
   @primary_key {:id, :string, []}
   schema "rooms" do

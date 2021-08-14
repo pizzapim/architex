@@ -1,4 +1,4 @@
-defmodule MatrixServerWeb.Plug.Error do
+defmodule MatrixServerWeb.Error do
   import Plug.Conn
   import Phoenix.Controller, only: [json: 2]
 

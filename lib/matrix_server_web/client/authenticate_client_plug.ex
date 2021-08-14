@@ -1,5 +1,5 @@
-defmodule MatrixServerWeb.Plug.AuthenticateClient do
-  import MatrixServerWeb.Plug.Error
+defmodule MatrixServerWeb.Client.AuthenticateClientPlug do
+  import MatrixServerWeb.Error
   import Plug.Conn
 
   alias MatrixServer.Account

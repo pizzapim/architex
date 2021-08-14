@@ -4,7 +4,7 @@ defmodule MatrixServer.Device do
   import Ecto.{Changeset, Query}
 
   alias MatrixServer.{Account, Device, Repo}
-  alias MatrixServerWeb.Request.Login
+  alias MatrixServerWeb.Client.Request.Login
 
   @primary_key false
   schema "devices" do

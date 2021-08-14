@@ -1,8 +1,8 @@
 defmodule MatrixServerWeb.Federation.QueryController do
   use MatrixServerWeb, :controller
-  use MatrixServerWeb.AuthenticateServer
+  use MatrixServerWeb.Federation.AuthenticateServer
 
-  import MatrixServerWeb.Plug.Error
+  import MatrixServerWeb.Error
   import Ecto.Query
 
   alias MatrixServer.{Repo, Account}

@@ -4,7 +4,7 @@ defmodule MatrixServer.Account do
   import Ecto.{Changeset, Query}
 
   alias MatrixServer.{Repo, Account, Device}
-  alias MatrixServerWeb.Request.{Register, Login}
+  alias MatrixServerWeb.Client.Request.{Register, Login}
   alias Ecto.Multi
 
   @max_mxid_length 255

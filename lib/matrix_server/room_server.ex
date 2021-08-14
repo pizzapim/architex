@@ -5,8 +5,8 @@ defmodule MatrixServer.RoomServer do
   import Ecto.Changeset
 
   alias MatrixServer.{Repo, Room, Event, StateResolution}
-  alias MatrixServerWeb.Request.CreateRoom
   alias MatrixServer.StateResolution.Authorization
+  alias MatrixServerWeb.Client.Request.CreateRoom
 
   @registry MatrixServer.RoomServer.Registry
   @supervisor MatrixServer.RoomServer.Supervisor

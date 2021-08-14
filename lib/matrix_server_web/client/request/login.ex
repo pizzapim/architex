@@ -1,4 +1,4 @@
-defmodule MatrixServerWeb.Request.Login do
+defmodule MatrixServerWeb.Client.Request.Login do
   use Ecto.Schema
 
   import Ecto.Changeset

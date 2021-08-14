@@ -1,7 +1,7 @@
 defmodule MatrixServerWeb.Federation.KeyController do
   use MatrixServerWeb, :controller
 
-  import MatrixServerWeb.Plug.Error
+  import MatrixServerWeb.Error
 
   alias MatrixServer.KeyServer
 

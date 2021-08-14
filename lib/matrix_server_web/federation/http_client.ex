@@ -1,20 +1,26 @@
-defmodule MatrixServerWeb.FederationClient do
+defmodule MatrixServerWeb.Federation.HTTPClient do
   use Tesla
 
   alias MatrixServerWeb.Endpoint
   alias MatrixServerWeb.Federation.Request.GetSigningKeys
+  alias MatrixServerWeb.Federation.Middleware.SignRequest
   alias MatrixServerWeb.Router.Helpers, as: RouteHelpers
 
   # TODO: Maybe create database-backed homeserver struct to pass to client function.
-
-  @middleware [
-    Tesla.Middleware.JSON
-  ]
+  # TODO: Fix error propagation.
 
   @adapter {Tesla.Adapter.Finch, name: MatrixServerWeb.HTTPClient}
 
   def client(server_name) do
-    Tesla.client([{Tesla.Middleware.BaseUrl, "http://" <> server_name} | @middleware], @adapter)
+    Tesla.client(
+      [
+        {Tesla.Middleware.Opts, [server_name: server_name]},
+        SignRequest,
+        {Tesla.Middleware.BaseUrl, "http://" <> server_name},
+        Tesla.Middleware.JSON
+      ],
+      @adapter
+    )
   end
 
   def get_signing_keys(client) do
@@ -45,30 +51,11 @@ defmodule MatrixServerWeb.FederationClient do
     end
   end
 
-  # TODO: Create tesla middleware to add signature and headers.
-  def query_profile(client, server_name, user_id, field \\ nil) do
-    origin = MatrixServer.server_name()
+  def query_profile(client, user_id, field \\ nil) do
     path = RouteHelpers.query_path(Endpoint, :profile) |> Tesla.build_url(user_id: user_id)
     path = if field, do: Tesla.build_url(path, field: field), else: path
 
-    object_to_sign = %{
-      method: "GET",
-      uri: URI.decode_www_form(path),
-      origin: origin,
-      destination: server_name
-    }
-
-    {:ok, signature, key_id} = MatrixServer.KeyServer.sign_object(object_to_sign)
-    signatures = %{origin => %{key_id => signature}}
-    auth_headers = create_signature_authorization_headers(signatures, origin)
-
-    Tesla.get(client, path, headers: auth_headers)
-  end
-
-  defp create_signature_authorization_headers(signatures, origin) do
-    Enum.map(signatures[origin], fn {key, sig} ->
-      {"Authorization", "X-Matrix origin=#{origin},key=\"#{key}\",sig=\"#{sig}\""}
-    end)
+    Tesla.get(client, path)
   end
 
   defp tesla_request(method, client, path, request_schema) do

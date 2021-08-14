@@ -1,5 +1,5 @@
-defmodule MatrixServerWeb.AuthenticateServer do
-  import MatrixServerWeb.Plug.Error
+defmodule MatrixServerWeb.Federation.AuthenticateServer do
+  import MatrixServerWeb.Error
 
   alias MatrixServer.{SigningKey, ServerKeyInfo}
 
@@ -71,7 +71,7 @@ defmodule MatrixServerWeb.AuthenticateServer do
         action = action_name(conn)
 
         if action not in unquote(except) do
-          case MatrixServerWeb.AuthenticateServer.authenticate(conn) do
+          case MatrixServerWeb.Federation.AuthenticateServer.authenticate(conn) do
             {origin, _key, _sig} ->
               conn = Plug.Conn.assign(conn, :origin, origin)
               apply(__MODULE__, action, [conn, conn.params])

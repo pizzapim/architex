@@ -1,7 +1,7 @@
 defmodule MatrixServerWeb.Client.AliasesController do
   use MatrixServerWeb, :controller
 
-  import MatrixServerWeb.Plug.Error
+  import MatrixServerWeb.Error
 
   alias MatrixServer.Alias
 

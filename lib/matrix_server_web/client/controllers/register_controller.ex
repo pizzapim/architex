@@ -1,11 +1,11 @@
 defmodule MatrixServerWeb.Client.RegisterController do
   use MatrixServerWeb, :controller
 
-  import MatrixServerWeb.Plug.Error
+  import MatrixServerWeb.Error
   import Ecto.Changeset
 
   alias MatrixServer.{Repo, Account}
-  alias MatrixServerWeb.Request.Register
+  alias MatrixServerWeb.Client.Request.Register
   alias Ecto.Changeset
 
   @register_type "m.login.dummy"

@@ -2,7 +2,7 @@ defmodule MatrixServerWeb.Client.AccountController do
   use MatrixServerWeb, :controller
 
   import MatrixServer
-  import MatrixServerWeb.Plug.Error
+  import MatrixServerWeb.Error
 
   alias MatrixServer.{Account, Repo}
   alias Plug.Conn
