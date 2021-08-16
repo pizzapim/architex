@@ -10,7 +10,7 @@ defmodule MatrixServer.ServerKeyInfo do
 
   @primary_key {:server_name, :string, []}
   schema "server_key_info" do
-    field :valid_until, :integer
+    field :valid_until, :utc_datetime
 
     has_many :signing_keys, SigningKey, foreign_key: :server_name
   end
@@ -34,31 +34,33 @@ defmodule MatrixServer.ServerKeyInfo do
 
   defp refresh_signing_keys(server_name) do
     # TODO: Handle expired keys.
-    in_a_week = System.os_time(:millisecond) + 1000 * 60 * 60 * 24 * 7
+    in_a_week = DateTime.utc_now() |> DateTime.add(60 * 60 * 24 * 7, :second)
     client = HTTPClient.client(server_name)
 
     with {:ok,
           %GetSigningKeys{
             server_name: server_name,
             verify_keys: verify_keys,
-            valid_until_ts: valid_until
-          }} <-
-           HTTPClient.get_signing_keys(client) do
+            valid_until_ts: valid_until_ts
+          }} <- HTTPClient.get_signing_keys(client),
+         {:ok, valid_until} <- DateTime.from_unix(valid_until_ts) do
       signing_keys =
         Enum.map(verify_keys, fn {key_id, %{"key" => key}} ->
           [server_name: server_name, signing_key_id: key_id, signing_key: key]
         end)
 
       # Always check every week to prevent misuse.
-      ski = %ServerKeyInfo{server_name: server_name, valid_until: min(valid_until, in_a_week)}
+      ski = %ServerKeyInfo{
+        server_name: server_name,
+        valid_until: MatrixServer.min_datetime(in_a_week, valid_until)
+      }
 
       case upsert_multi(server_name, ski, signing_keys) |> Repo.transaction() do
         {:ok, %{new_ski: ski}} -> {:ok, ski}
         {:error, _} -> :error
       end
     else
-      :error ->
-        :error
+      _ -> :error
     end
   end
 

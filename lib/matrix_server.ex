@@ -126,4 +126,12 @@ defmodule MatrixServer do
       ArgumentError -> false
     end
   end
+
+  def min_datetime(datetime1, datetime2) do
+    if DateTime.compare(datetime1, datetime2) == :gt do
+      datetime2
+    else
+      datetime1
+    end
+  end
 end

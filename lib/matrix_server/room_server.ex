@@ -46,6 +46,10 @@ defmodule MatrixServer.RoomServer do
     GenServer.call(pid, {:create_room, account, input})
   end
 
+  def server_in_room(pid, domain) do
+    GenServer.call(pid, {:server_in_room, domain})
+  end
+
   ### Implementation
 
   @impl true
@@ -118,6 +122,18 @@ defmodule MatrixServer.RoomServer do
       {:error, reason} -> {:reply, {:error, reason}, state}
       _ -> {:reply, {:error, :unknown}, state}
     end
+  end
+
+  def handle_call({:server_in_room, domain}, _from, %{state_set: state_set} = state) do
+    result = Enum.any?(state_set, fn
+      {{"m.room.member", user_id}, %Event{content: %{"membership" => "join"}}} ->
+        MatrixServer.get_domain(user_id) == domain
+
+      _ ->
+        false
+    end)
+
+    {:reply, result, state}
   end
 
   # TODO: trusted_private_chat:

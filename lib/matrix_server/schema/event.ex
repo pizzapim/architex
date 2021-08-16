@@ -8,7 +8,7 @@ defmodule MatrixServer.Event do
   @primary_key {:event_id, :string, []}
   schema "events" do
     field :type, :string
-    field :origin_server_ts, :integer
+    field :origin_server_ts, :utc_datetime_usec
     field :state_key, :string
     field :sender, :string
     field :content, :map
@@ -27,7 +27,7 @@ defmodule MatrixServer.Event do
       room_id: room_id,
       sender: MatrixServer.get_mxid(localpart),
       event_id: generate_event_id(),
-      origin_server_ts: System.os_time(:millisecond),
+      origin_server_ts: DateTime.utc_now(),
       prev_events: [],
       auth_events: []
     }
