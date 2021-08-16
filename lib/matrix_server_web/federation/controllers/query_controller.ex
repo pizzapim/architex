@@ -5,7 +5,7 @@ defmodule MatrixServerWeb.Federation.QueryController do
   import MatrixServerWeb.Error
   import Ecto.Query
 
-  alias MatrixServer.{Repo, Account}
+  alias MatrixServer.{Repo, Account, Identifier}
 
   defmodule ProfileRequest do
     use Ecto.Schema
@@ -14,7 +14,7 @@ defmodule MatrixServerWeb.Federation.QueryController do
 
     @primary_key false
     embedded_schema do
-      field :user_id, :string
+      field :user_id, Identifier
       field :field, :string
     end
 
@@ -31,10 +31,10 @@ defmodule MatrixServerWeb.Federation.QueryController do
   end
 
   def profile(conn, params) do
-    with {:ok, %ProfileRequest{user_id: user_id}} <- ProfileRequest.validate(params) do
-      if MatrixServer.get_domain(user_id) == MatrixServer.server_name() do
-        localpart = MatrixServer.get_localpart(user_id)
-
+    with {:ok,
+          %ProfileRequest{user_id: %Identifier{type: :user, localpart: localpart, domain: domain}}} <-
+           ProfileRequest.validate(params) do
+      if domain == MatrixServer.server_name() do
         case Repo.one(from a in Account, where: a.localpart == ^localpart) do
           %Account{} ->
             # TODO: Return displayname and avatar_url when we implement them.
