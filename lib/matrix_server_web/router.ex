@@ -1,10 +1,12 @@
 defmodule MatrixServerWeb.Router do
   use MatrixServerWeb, :router
 
-  alias MatrixServerWeb.Client.AuthenticateClientPlug
+  alias MatrixServerWeb.Client.Plug.AuthenticateClient
 
   # TODO: might be able to handle malformed JSON with custom body reader:
   # https://elixirforum.com/t/write-malformed-json-in-the-body-plug/30578/13
+
+  # TODO: Split endpoint into client and federation?
 
   pipeline :public do
     plug :accepts, ["json"]
@@ -12,36 +14,39 @@ defmodule MatrixServerWeb.Router do
 
   pipeline :authenticate_client do
     plug :accepts, ["json"]
-    plug AuthenticateClientPlug
+    plug AuthenticateClient
   end
 
   pipeline :authenticate_server do
     plug :accepts, ["json"]
   end
 
-  scope "/_matrix", MatrixServerWeb do
+  # Public client endpoint.
+  scope "/_matrix/client", MatrixServerWeb.Client do
     pipe_through :public
 
-    scope "/client", Client do
-      scope "/r0" do
-        post "/register", RegisterController, :register
-        get "/register/available", AccountController, :available
-        get "/login", LoginController, :login_types
-        post "/login", LoginController, :login
-      end
-
-      get "/versions", InfoController, :versions
+    scope "/r0" do
+      post "/register", RegisterController, :register
+      get "/register/available", AccountController, :available
+      get "/login", LoginController, :login_types
+      post "/login", LoginController, :login
     end
 
-    scope "/key/v2", Federation do
+    get "/versions", InfoController, :versions
+  end
+
+  # Public federation endpoint.
+  scope "/_matrix", MatrixServerWeb.Federation do
+    scope "/key/v2" do
       get "/server", KeyController, :get_signing_keys
     end
   end
 
-  scope "/_matrix", MatrixServerWeb.Client do
+  # Authenticated client endpoint.
+  scope "/_matrix/client", MatrixServerWeb.Client do
     pipe_through :authenticate_client
 
-    scope "/client/r0" do
+    scope "/r0" do
       get "/account/whoami", AccountController, :whoami
       post "/logout", AccountController, :logout
       post "/logout/all", AccountController, :logout_all
@@ -53,10 +58,14 @@ defmodule MatrixServerWeb.Router do
     end
   end
 
-  scope "/_matrix", MatrixServerWeb.Federation do
+  # Authenticated federation endpoint.
+  scope "/_matrix/federation", MatrixServerWeb.Federation do
     pipe_through :authenticate_server
 
-    get "/federation/v1/query/profile", QueryController, :profile
+    scope "/v1" do
+      get "/query/profile", QueryController, :profile
+      get "/event/:event_id", EventController, :event
+    end
   end
 
   scope "/", MatrixServerWeb.Client do

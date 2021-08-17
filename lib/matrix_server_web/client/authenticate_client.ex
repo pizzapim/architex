@@ -1,4 +1,4 @@
-defmodule MatrixServerWeb.Client.AuthenticateClientPlug do
+defmodule MatrixServerWeb.Client.Plug.AuthenticateClient do
   import MatrixServerWeb.Error
   import Plug.Conn
 
