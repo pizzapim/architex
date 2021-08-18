@@ -40,14 +40,16 @@ room =
     visibility: :public
   })
 
-Repo.insert!(
-  Event.create_room(room, alice, "v1")
-  |> Map.put(:origin_server_ts, timestamp.(0))
-  |> Map.put(:event_id, "create")
-)
+create_room =
+  Repo.insert!(
+    Event.create_room(room, alice, "v1", false)
+    |> Map.put(:origin_server_ts, timestamp.(0))
+    |> Event.post_process()
+    |> elem(1)
+  )
 
 Repo.insert!(
-  Event.join(room, alice)
+  Event.join(room, alice, false)
   |> Map.put(:prev_events, ["create"])
   |> Map.put(:auth_events, ["create"])
   |> Map.put(:origin_server_ts, timestamp.(1))
@@ -56,6 +58,7 @@ Repo.insert!(
 
 Repo.insert!(
   Event.join(room, bob)
+  |> elem(1)
   |> Map.put(:prev_events, ["join_alice"])
   |> Map.put(:auth_events, ["create"])
   |> Map.put(:origin_server_ts, timestamp.(2))
@@ -64,13 +67,14 @@ Repo.insert!(
 
 Repo.insert!(
   Event.join(room, charlie)
+  |> elem(1)
   |> Map.put(:prev_events, ["join_bob"])
   |> Map.put(:auth_events, ["create"])
   |> Map.put(:origin_server_ts, timestamp.(3))
   |> Map.put(:event_id, "join_charlie")
 )
 
-%Event{content: content} = event = Event.power_levels(room, alice)
+%Event{content: content} = event = Event.power_levels(room, alice) |> elem(1)
 event = %Event{event | content: %{content | "users" => %{"alice" => 100, "bob" => 100}}}
 
 Repo.insert!(
@@ -81,7 +85,7 @@ Repo.insert!(
   |> Map.put(:event_id, "a")
 )
 
-%Event{content: content} = event = Event.power_levels(room, bob)
+%Event{content: content} = event = Event.power_levels(room, bob) |> elem(1)
 
 event = %Event{
   event
@@ -98,6 +102,7 @@ Repo.insert!(
 
 Repo.insert!(
   Event.topic(room, alice, "sneed")
+  |> elem(1)
   |> Map.put(:prev_events, ["a"])
   |> Map.put(:auth_events, ["create", "join_alice", "a"])
   |> Map.put(:origin_server_ts, timestamp.(5))

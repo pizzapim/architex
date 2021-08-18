@@ -7,6 +7,12 @@ defmodule MatrixServer.Room do
   alias MatrixServer.{Repo, Room, Event, Alias, RoomServer}
   alias MatrixServerWeb.Client.Request.CreateRoom
 
+  @type t :: %__MODULE__{
+    visibility: :public | :private,
+    state: list(list(String.t())),
+    forward_extremities: list(String.t())
+  }
+
   @primary_key {:id, :string, []}
   schema "rooms" do
     field :visibility, Ecto.Enum, values: [:public, :private]

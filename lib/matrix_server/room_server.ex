@@ -20,6 +20,7 @@ defmodule MatrixServer.RoomServer do
 
   # Get room server pid, or spin one up for the room.
   # If the room does not exist, return an error.
+  @spec get_room_server(String.t()) :: {:error, :not_found} | DynamicSupervisor.on_start_child()
   def get_room_server(room_id) do
     case Repo.one(from r in Room, where: r.id == ^room_id) do
       nil ->
@@ -42,10 +43,12 @@ defmodule MatrixServer.RoomServer do
     end
   end
 
+  @spec create_room(pid(), MatrixServer.Account.t(), MatrixServerWeb.Client.Request.CreateRoom.t()) :: {:ok, String.t()} | {:error, atom()}
   def create_room(pid, account, input) do
     GenServer.call(pid, {:create_room, account, input})
   end
 
+  @spec server_in_room(pid(), String.t()) :: boolean()
   def server_in_room(pid, domain) do
     GenServer.call(pid, {:server_in_room, domain})
   end

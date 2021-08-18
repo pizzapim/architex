@@ -10,7 +10,8 @@ defmodule MatrixServer.MixProject do
       compilers: [:phoenix] ++ Mix.compilers(),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
-      deps: deps()
+      deps: deps(),
+      dialyzer: [plt_add_deps: :app_tree]
     ]
   end
 
@@ -46,7 +47,8 @@ defmodule MatrixServer.MixProject do
       {:ex_machina, "~> 2.7", only: :test},
       {:enacl, "~> 1.2"},
       {:tesla, "~> 1.4"},
-      {:finch, "~> 0.8.1"}
+      {:finch, "~> 0.8.1"},
+      {:dialyxir, "~> 1.1", only: [:dev], runtime: false}
     ]
   end
 

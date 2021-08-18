@@ -1,39 +1,33 @@
 defmodule MatrixServer do
   alias MatrixServer.EncodableMap
 
+  @random_string_alphabet Enum.into(?a..?z, []) ++ Enum.into(?A..?Z, [])
+
+  @spec get_mxid(String.t()) :: String.t()
   def get_mxid(localpart) when is_binary(localpart) do
     "@#{localpart}:#{server_name()}"
   end
 
+  @spec server_name() :: String.t()
   def server_name do
     Application.get_env(:matrix_server, :server_name)
   end
 
-  def maybe_update_map(map, old_key, new_key) do
-    maybe_update_map(map, old_key, new_key, &Function.identity/1)
-  end
-
-  def maybe_update_map(map, old_key, new_key, fun) when is_map_key(map, old_key) do
-    value = Map.fetch!(map, old_key)
-
-    map
-    |> Map.put(new_key, fun.(value))
-    |> Map.delete(old_key)
-  end
-
-  def maybe_update_map(map, _, _, _), do: map
-
+  @spec localpart_regex() :: Regex.t()
   def localpart_regex, do: ~r/^([a-z0-9\._=\/])+$/
 
-  @alphabet Enum.into(?a..?z, []) ++ Enum.into(?A..?Z, [])
-  def random_string(length), do: random_string(length, @alphabet)
+  @spec random_string(pos_integer()) :: String.t()
+  def random_string(length), do: random_string(length, @random_string_alphabet)
 
+  @spec random_string(pos_integer(), Enum.t()) :: String.t()
   def random_string(length, alphabet) when length >= 1 do
     for _ <- 1..length, into: "", do: <<Enum.random(alphabet)>>
   end
 
+  @spec default_room_version() :: String.t()
   def default_room_version, do: "7"
 
+  @spec get_domain(String.t()) :: String.t() | nil
   def get_domain(id) do
     case String.split(id, ":", parts: 2) do
       [_, server_name] -> server_name
@@ -42,6 +36,7 @@ defmodule MatrixServer do
   end
 
   # TODO Eventually move to regex with named captures.
+  @spec get_localpart(String.t()) :: String.t() | nil
   def get_localpart(id) do
     with [part, _] <- String.split(id, ":", parts: 2),
          {_, localpart} <- String.split_at(part, 1) do
@@ -52,6 +47,7 @@ defmodule MatrixServer do
   end
 
   # https://elixirforum.com/t/22709/9
+  @spec has_duplicates?(list()) :: boolean()
   def has_duplicates?(list) do
     list
     |> Enum.reduce_while(%MapSet{}, fn x, acc ->
@@ -61,6 +57,7 @@ defmodule MatrixServer do
   end
 
   # https://matrix.org/docs/spec/appendices#unpadded-base64
+  @spec encode_unpadded_base64(String.t()) :: String.t()
   def encode_unpadded_base64(data) do
     data
     |> Base.encode64()
@@ -68,12 +65,14 @@ defmodule MatrixServer do
   end
 
   # Decode (possibly unpadded) base64.
+  @spec decode_base64(String.t()) :: {:ok, String.t()} | :error
   def decode_base64(data) when is_binary(data) do
     rem = rem(String.length(data), 4)
     padded_data = if rem > 0, do: data <> String.duplicate("=", 4 - rem), else: data
     Base.decode64(padded_data)
   end
 
+  @spec encode_canonical_json(map()) :: {:ok, String.t()} | {:error, Jason.EncodeError.t()}
   def encode_canonical_json(object) do
     object
     |> EncodableMap.from_map()
@@ -81,6 +80,7 @@ defmodule MatrixServer do
   end
 
   # https://stackoverflow.com/questions/41523762/41671211
+  @spec to_serializable_map(struct()) :: map()
   def to_serializable_map(struct) do
     association_fields = struct.__struct__.__schema__(:associations)
     waste_fields = association_fields ++ [:__meta__]
@@ -90,6 +90,7 @@ defmodule MatrixServer do
     |> Map.drop(waste_fields)
   end
 
+  @spec serialize_and_encode(struct()) :: {:ok, String.t()} | {:error, Jason.EncodeError.t()}
   def serialize_and_encode(struct) do
     # TODO: handle nil values in struct?
     struct
@@ -97,6 +98,7 @@ defmodule MatrixServer do
     |> encode_canonical_json()
   end
 
+  @spec add_signature(map(), String.t(), String.t()) :: map()
   def add_signature(object, key_id, sig) when not is_map_key(object, :signatures) do
     Map.put(object, :signatures, %{MatrixServer.server_name() => %{key_id => sig}})
   end
@@ -108,6 +110,7 @@ defmodule MatrixServer do
     %{object | signatures: new_sigs}
   end
 
+  @spec validate_change_simple(Ecto.Changeset.t(), atom(), (term() -> boolean())) :: Ecto.Changeset.t()
   def validate_change_simple(changeset, field, func) do
     augmented_func = fn _, val ->
       if func.(val), do: [], else: [{field, "invalid"}]
@@ -118,6 +121,7 @@ defmodule MatrixServer do
 
   # Returns a Boolean whether the signature is valid.
   # Also returns false on ArgumentError.
+  @spec sign_verify(binary(), String.t(), binary()) :: boolean()
   def sign_verify(sig, text, key) do
     try do
       :enacl.sign_verify_detached(sig, text, key)
@@ -126,6 +130,7 @@ defmodule MatrixServer do
     end
   end
 
+  @spec min_datetime(DateTime.t(), DateTime.t()) :: DateTime.t()
   def min_datetime(datetime1, datetime2) do
     if DateTime.compare(datetime1, datetime2) == :gt do
       datetime2
@@ -134,6 +139,7 @@ defmodule MatrixServer do
     end
   end
 
+  @spec encode_url_safe_base64(String.t()) :: String.t()
   def encode_url_safe_base64(data) do
     data
     |> encode_unpadded_base64()

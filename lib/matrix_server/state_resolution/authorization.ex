@@ -129,8 +129,10 @@ defmodule MatrixServer.StateResolution.Authorization do
   end
 
   defp _authorized?(%Event{type: "m.room.third_party_invite", sender: sender}, state_set) do
+    power_levels = get_power_levels(state_set)
     # Check rule: 7.1
-    has_power_level(sender, state_set, :invite)
+
+    has_power_level(sender, power_levels, :invite)
   end
 
   defp _authorized?(%Event{state_key: state_key, sender: sender} = event, state_set) do
@@ -202,8 +204,10 @@ defmodule MatrixServer.StateResolution.Authorization do
   defp get_action_power_level(:invite, _), do: 50
   defp get_action_power_level(:ban, %{"ban" => pl}), do: pl
   defp get_action_power_level(:ban, _), do: 50
-  defp get_action_power_level(:redact, %{"redact" => pl}), do: pl
-  defp get_action_power_level(:redact, _), do: 50
+  # defp get_action_power_level(:redact, %{"redact" => pl}), do: pl
+  # defp get_action_power_level(:redact, _), do: 50
+  # defp get_action_power_level(:kick, %{"kick" => pl}), do: pl
+  # defp get_action_power_level(:kick, _), do: 50
 
   defp get_action_power_level({:event, %Event{type: type}}, %{"events" => events})
        when is_map_key(events, type),

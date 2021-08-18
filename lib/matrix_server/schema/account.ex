@@ -7,6 +7,10 @@ defmodule MatrixServer.Account do
   alias MatrixServerWeb.Client.Request.{Register, Login}
   alias Ecto.Multi
 
+  @type t :: %__MODULE__{
+    password_hash: String.t()
+  }
+
   @max_mxid_length 255
 
   @primary_key {:localpart, :string, []}

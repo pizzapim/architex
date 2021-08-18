@@ -10,10 +10,12 @@ defmodule MatrixServer.KeyServer do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
 
+  @spec sign_object(map()) :: {:ok, String.t(), String.t()} | :error
   def sign_object(object) do
     GenServer.call(__MODULE__, {:sign_object, object})
   end
 
+  @spec get_own_signing_keys() :: list({String.t(), binary()})
   def get_own_signing_keys() do
     GenServer.call(__MODULE__, :get_own_signing_keys)
   end
@@ -41,6 +43,7 @@ defmodule MatrixServer.KeyServer do
   end
 
   # https://blog.swwomm.com/2020/09/elixir-ed25519-signatures-with-enacl.html
+  @spec sign_object(map(), binary()) :: {:ok, String.t()} | {:error, Jason.EncodeError.t()}
   defp sign_object(object, private_key) do
     object = Map.drop(object, [:signatures, :unsigned])
 
@@ -55,7 +58,8 @@ defmodule MatrixServer.KeyServer do
   end
 
   # TODO: not sure if there is a better way to do this...
-  def read_keys do
+  @spec read_keys() :: {binary(), binary()}
+  defp read_keys do
     raw_priv_key =
       Application.get_env(:matrix_server, :private_key_file)
       |> File.read!()
