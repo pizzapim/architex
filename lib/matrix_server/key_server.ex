@@ -42,6 +42,8 @@ defmodule MatrixServer.KeyServer do
 
   # https://blog.swwomm.com/2020/09/elixir-ed25519-signatures-with-enacl.html
   defp sign_object(object, private_key) do
+    object = Map.drop(object, [:signatures, :unsigned])
+
     with {:ok, json} <- MatrixServer.encode_canonical_json(object) do
       signature =
         json

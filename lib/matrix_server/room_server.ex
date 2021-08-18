@@ -70,70 +70,83 @@ defmodule MatrixServer.RoomServer do
   end
 
   @impl true
-  def handle_call(
-        {:create_room, account,
-         %CreateRoom{room_version: room_version, name: name, topic: topic, preset: preset}},
-        _from,
-        %{room_id: room_id} = state
-      ) do
-    result =
-      Repo.transaction(fn ->
-        room = Repo.one!(from r in Room, where: r.id == ^room_id)
-        create_room = Event.create_room(room, account, room_version)
-        join_creator = Event.join(room, account, [create_room.event_id])
-        pls = Event.power_levels(room, account, [create_room.event_id, join_creator.event_id])
-        auth_events = [create_room.event_id, join_creator.event_id, pls.event_id]
-        name_event = if name, do: Event.name(room, account, name, auth_events)
-        topic_event = if topic, do: Event.topic(room, account, topic, auth_events)
+  def handle_call({:create_room, account, input}, _from, %{room_id: room_id} = state) do
+    # TODO: power_level_content_override, initial_state, invite, invite_3pid
+    room = Repo.one!(from r in Room, where: r.id == ^room_id)
 
-        # TODO: power_level_content_override, initial_state, invite, invite_3pid
-        events =
-          [create_room, join_creator, pls] ++
-            room_creation_preset(account, preset, room, auth_events) ++
-            [name_event, topic_event]
-
-        result =
-          events
-          |> Enum.reject(&Kernel.is_nil/1)
-          |> Enum.reduce_while({%{}, room}, fn event, {state_set, room} ->
-            case verify_and_insert_event(event, state_set, room) do
-              {:ok, state_set, room} -> {:cont, {state_set, room}}
-              {:error, reason} -> {:halt, {:error, reason}}
-            end
-          end)
-
-        case result do
-          {:error, reason} ->
-            Repo.rollback(reason)
-
-          {state_set, room} ->
-            serialized_state_set =
-              Enum.map(state_set, fn {{type, state_key}, event} ->
-                [type, state_key, event.event_id]
-              end)
-
-            Repo.update!(change(room, state: serialized_state_set))
-            state_set
+    case create_room_events(room, account, input) do
+      events when is_list(events) ->
+        case Repo.transaction(create_room_insert_events(room, events)) do
+          {:ok, state_set} -> {:reply, {:ok, room_id}, %{state | state_set: state_set}}
+          {:error, reason} -> {:reply, {:error, reason}, state}
+          _ -> {:reply, {:error, :unknown}, state}
         end
-      end)
 
-    case result do
-      {:ok, state_set} -> {:reply, {:ok, room_id}, %{state | state_set: state_set}}
-      {:error, reason} -> {:reply, {:error, reason}, state}
-      _ -> {:reply, {:error, :unknown}, state}
+      :error ->
+        {:reply, {:error, :event_creation}, state}
     end
   end
 
   def handle_call({:server_in_room, domain}, _from, %{state_set: state_set} = state) do
-    result = Enum.any?(state_set, fn
-      {{"m.room.member", user_id}, %Event{content: %{"membership" => "join"}}} ->
-        MatrixServer.get_domain(user_id) == domain
+    result =
+      Enum.any?(state_set, fn
+        {{"m.room.member", user_id}, %Event{content: %{"membership" => "join"}}} ->
+          MatrixServer.get_domain(user_id) == domain
 
-      _ ->
-        false
-    end)
+        _ ->
+          false
+      end)
 
     {:reply, result, state}
+  end
+
+  defp create_room_events(room, account, %CreateRoom{
+         room_version: room_version,
+         name: name,
+         topic: topic,
+         preset: preset
+       }) do
+    with {:ok, create_room} <- Event.create_room(room, account, room_version),
+         {:ok, join_creator} <- Event.join(room, account, [create_room]),
+         {:ok, pls} <- Event.power_levels(room, account, [create_room, join_creator]),
+         auth_events <- [create_room, join_creator, pls],
+         {:ok, preset_events} <- room_creation_preset(account, preset, room, auth_events),
+         {:ok, name_event} <-
+           if(name, do: Event.name(room, account, name, auth_events), else: {:ok, nil}),
+         {:ok, topic_event} <-
+           if(topic, do: Event.topic(room, account, topic, auth_events), else: {:ok, nil}) do
+      events = [create_room, join_creator, pls] ++ preset_events ++ [name_event, topic_event]
+
+      Enum.reject(events, &Kernel.is_nil/1)
+    else
+      _ -> :error
+    end
+  end
+
+  defp create_room_insert_events(room, events) do
+    fn ->
+      result =
+        Enum.reduce_while(events, {%{}, room}, fn event, {state_set, room} ->
+          case verify_and_insert_event(event, state_set, room) do
+            {:ok, state_set, room} -> {:cont, {state_set, room}}
+            {:error, reason} -> {:halt, {:error, reason}}
+          end
+        end)
+
+      case result do
+        {:error, reason} ->
+          Repo.rollback(reason)
+
+        {state_set, room} ->
+          serialized_state_set =
+            Enum.map(state_set, fn {{type, state_key}, event} ->
+              [type, state_key, event.event_id]
+            end)
+
+          Repo.update!(change(room, state: serialized_state_set))
+          state_set
+      end
+    end
   end
 
   # TODO: trusted_private_chat:
@@ -156,11 +169,11 @@ defmodule MatrixServer.RoomServer do
         "public_chat" -> {"public", "shared", "forbidden"}
       end
 
-    [
-      Event.join_rules(room, account, join_rule, auth_events),
-      Event.history_visibility(room, account, his_vis, auth_events),
-      Event.guest_access(room, account, guest_access, auth_events)
-    ]
+    with {:ok, join_rules} <- Event.join_rules(room, account, join_rule, auth_events),
+         {:ok, his_vis} <- Event.history_visibility(room, account, his_vis, auth_events),
+         {:ok, guest_access} <- Event.guest_access(room, account, guest_access, auth_events) do
+      {:ok, [join_rules, his_vis, guest_access]}
+    end
   end
 
   defp verify_and_insert_event(

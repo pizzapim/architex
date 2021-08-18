@@ -1,5 +1,5 @@
 defmodule MatrixServer do
-  alias MatrixServer.OrderedMap
+  alias MatrixServer.EncodableMap
 
   def get_mxid(localpart) when is_binary(localpart) do
     "@#{localpart}:#{server_name()}"
@@ -76,8 +76,7 @@ defmodule MatrixServer do
 
   def encode_canonical_json(object) do
     object
-    |> Map.drop([:signatures, :unsigned])
-    |> OrderedMap.from_map()
+    |> EncodableMap.from_map()
     |> Jason.encode()
   end
 
@@ -133,5 +132,12 @@ defmodule MatrixServer do
     else
       datetime1
     end
+  end
+
+  def encode_url_safe_base64(data) do
+    data
+    |> encode_unpadded_base64()
+    |> String.replace("+", "-")
+    |> String.replace("/", "_")
   end
 end

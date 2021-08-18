@@ -3,7 +3,7 @@ defmodule MatrixServer.Event do
 
   import Ecto.Query
 
-  alias MatrixServer.{Repo, Room, Event, Account, OrderedMap, KeyServer}
+  alias MatrixServer.{Repo, Room, Event, Account, EncodableMap, KeyServer}
 
   @primary_key {:event_id, :string, []}
   schema "events" do
@@ -26,46 +26,58 @@ defmodule MatrixServer.Event do
     %Event{
       room_id: room_id,
       sender: MatrixServer.get_mxid(localpart),
-      event_id: generate_event_id(),
       origin_server_ts: DateTime.utc_now(),
       prev_events: [],
       auth_events: []
     }
   end
 
-  def create_room(room, %Account{localpart: localpart} = creator, room_version, auth_events \\ []) do
+  def create_room(
+        room,
+        %Account{localpart: localpart} = creator,
+        room_version,
+        generate_id \\ true
+      ) do
     mxid = MatrixServer.get_mxid(localpart)
 
-    %Event{
+    event = %Event{
       new(room, creator)
       | type: "m.room.create",
         state_key: "",
         content: %{
           "creator" => mxid,
           "room_version" => room_version || MatrixServer.default_room_version()
-        },
-        auth_events: auth_events
+        }
     }
+
+    if generate_id, do: set_event_id(event), else: event
   end
 
-  def join(room, %Account{localpart: localpart} = sender, auth_events \\ []) do
+  def join(room, %Account{localpart: localpart} = sender, auth_events, generate_id \\ true) do
     mxid = MatrixServer.get_mxid(localpart)
 
-    %Event{
+    event = %Event{
       new(room, sender)
       | type: "m.room.member",
         state_key: mxid,
         content: %{
           "membership" => "join"
         },
-        auth_events: auth_events
+        auth_events: Enum.map(auth_events, & &1.event_id)
     }
+
+    if generate_id, do: set_event_id(event), else: event
   end
 
-  def power_levels(room, %Account{localpart: localpart} = sender, auth_events \\ []) do
+  def power_levels(
+        room,
+        %Account{localpart: localpart} = sender,
+        auth_events,
+        generate_id \\ true
+      ) do
     mxid = MatrixServer.get_mxid(localpart)
 
-    %Event{
+    event = %Event{
       new(room, sender)
       | type: "m.room.power_levels",
         state_key: "",
@@ -85,72 +97,80 @@ defmodule MatrixServer.Event do
             "room" => 50
           }
         },
-        auth_events: auth_events
+        auth_events: Enum.map(auth_events, & &1.event_id)
     }
+
+    if generate_id, do: set_event_id(event), else: event
   end
 
-  def name(room, sender, name, auth_events \\ []) do
-    %Event{
+  def name(room, sender, name, auth_events, generate_id \\ true) do
+    event = %Event{
       new(room, sender)
       | type: "m.room.name",
         state_key: "",
         content: %{
           "name" => name
         },
-        auth_events: auth_events
+        auth_events: Enum.map(auth_events, & &1.event_id)
     }
+
+    if generate_id, do: set_event_id(event), else: event
   end
 
-  def topic(room, sender, topic, auth_events \\ []) do
-    %Event{
+  def topic(room, sender, topic, auth_events, generate_id \\ true) do
+    event = %Event{
       new(room, sender)
       | type: "m.room.topic",
         state_key: "",
         content: %{
           "topic" => topic
         },
-        auth_events: auth_events
+        auth_events: Enum.map(auth_events, & &1.event_id)
     }
+
+    if generate_id, do: set_event_id(event), else: event
   end
 
-  def join_rules(room, sender, join_rule, auth_events \\ []) do
-    %Event{
+  def join_rules(room, sender, join_rule, auth_events, generate_id \\ true) do
+    event = %Event{
       new(room, sender)
       | type: "m.room.join_rules",
         state_key: "",
         content: %{
           "join_rule" => join_rule
         },
-        auth_events: auth_events
+        auth_events: Enum.map(auth_events, & &1.event_id)
     }
+
+    if generate_id, do: set_event_id(event), else: event
   end
 
-  def history_visibility(room, sender, history_visibility, auth_events \\ []) do
-    %Event{
+  def history_visibility(room, sender, history_visibility, auth_events, generate_id \\ true) do
+    event = %Event{
       new(room, sender)
       | type: "m.room.history_visibility",
         state_key: "",
         content: %{
           "history_visibility" => history_visibility
         },
-        auth_events: auth_events
+        auth_events: Enum.map(auth_events, & &1.event_id)
     }
+
+    if generate_id, do: set_event_id(event), else: event
   end
 
-  def guest_access(room, sender, guest_access, auth_events \\ []) do
-    %Event{
+  def guest_access(room, sender, guest_access, auth_events, generate_id \\ true) do
+    event = %Event{
       new(room, sender)
       | type: "m.room.guest_access",
         state_key: "",
         content: %{
           "guest_access" => guest_access
         },
-        auth_events: auth_events
+        auth_events: Enum.map(auth_events, & &1.event_id)
     }
-  end
 
-  def generate_event_id do
-    "$" <> MatrixServer.random_string(17) <> ":" <> MatrixServer.server_name()
+    if generate_id, do: set_event_id(event), else: event
   end
 
   def is_control_event(%Event{type: "m.room.power_levels", state_key: ""}), do: true
@@ -275,7 +295,10 @@ defmodule MatrixServer.Event do
   end
 
   def sign(event) do
-    content_hash = calculate_content_hash(event)
+    content_hash =
+      event
+      |> calculate_content_hash()
+      |> MatrixServer.encode_unpadded_base64()
 
     event
     |> Map.put(:hashes, %{"sha256" => content_hash})
@@ -284,20 +307,15 @@ defmodule MatrixServer.Event do
   end
 
   defp calculate_content_hash(event) do
-    result =
+    m =
       event
       |> MatrixServer.to_serializable_map()
       |> Map.drop([:unsigned, :signature, :hashes])
-      |> OrderedMap.from_map()
+      |> EncodableMap.from_map()
       |> Jason.encode()
 
-    case result do
-      {:ok, json} ->
-        :crypto.hash(:sha256, json)
-        |> MatrixServer.encode_unpadded_base64()
-
-      error ->
-        error
+    with {:ok, json} <- Jason.encode(m) do
+      :crypto.hash(:sha256, json)
     end
   end
 
@@ -346,4 +364,29 @@ defmodule MatrixServer.Event do
         "users",
         "users_default"
       ])
+
+  defp redact_content(_, _), do: %{}
+
+  def set_event_id(event) do
+    with {:ok, event_id} <- generate_event_id(event) do
+      {:ok, %Event{event | event_id: event_id}}
+    end
+  end
+
+  defp generate_event_id(event) do
+    with {:ok, hash} <- calculate_reference_hash(event) do
+      {:ok, "$" <> MatrixServer.encode_url_safe_base64(hash)}
+    end
+  end
+
+  defp calculate_reference_hash(event) do
+    redacted_event =
+      event
+      |> redact()
+      |> Map.drop([:unsigned, :signature, :age_ts])
+
+    with {:ok, json} <- MatrixServer.encode_canonical_json(redacted_event) do
+      {:ok, :crypto.hash(:sha256, json)}
+    end
+  end
 end
