@@ -14,11 +14,10 @@ defmodule MatrixServer.Event do
     field :content, :map
     field :prev_events, {:array, :string}
     field :auth_events, {:array, :string}
-    # TODO: make these database fields eventually?
-    field :signing_keys, :map, virtual: true, default: %{}
-    field :unsigned, :map, virtual: true, default: %{}
-    field :signatures, :map, virtual: true, default: %{}
-    field :hashes, :map, virtual: true, default: %{}
+    field :unsigned, :map
+    field :signatures, {:map, {:map, :string}}
+    field :hashes, {:map, :string}
+
     belongs_to :room, Room, type: :string
   end
 
@@ -35,12 +34,11 @@ defmodule MatrixServer.Event do
   def create_room(
         room,
         %Account{localpart: localpart} = creator,
-        room_version,
-        generate_id \\ true
+        room_version
       ) do
     mxid = MatrixServer.get_mxid(localpart)
 
-    event = %Event{
+    %Event{
       new(room, creator)
       | type: "m.room.create",
         state_key: "",
@@ -49,14 +47,12 @@ defmodule MatrixServer.Event do
           "room_version" => room_version || MatrixServer.default_room_version()
         }
     }
-
-    if generate_id, do: set_event_id(event), else: event
   end
 
-  def join(room, %Account{localpart: localpart} = sender, auth_events, generate_id \\ true) do
+  def join(room, %Account{localpart: localpart} = sender, auth_events) do
     mxid = MatrixServer.get_mxid(localpart)
 
-    event = %Event{
+    %Event{
       new(room, sender)
       | type: "m.room.member",
         state_key: mxid,
@@ -65,19 +61,16 @@ defmodule MatrixServer.Event do
         },
         auth_events: Enum.map(auth_events, & &1.event_id)
     }
-
-    if generate_id, do: set_event_id(event), else: event
   end
 
   def power_levels(
         room,
         %Account{localpart: localpart} = sender,
-        auth_events,
-        generate_id \\ true
+        auth_events
       ) do
     mxid = MatrixServer.get_mxid(localpart)
 
-    event = %Event{
+    %Event{
       new(room, sender)
       | type: "m.room.power_levels",
         state_key: "",
@@ -99,12 +92,10 @@ defmodule MatrixServer.Event do
         },
         auth_events: Enum.map(auth_events, & &1.event_id)
     }
-
-    if generate_id, do: set_event_id(event), else: event
   end
 
-  def name(room, sender, name, auth_events, generate_id \\ true) do
-    event = %Event{
+  def name(room, sender, name, auth_events) do
+    %Event{
       new(room, sender)
       | type: "m.room.name",
         state_key: "",
@@ -113,12 +104,10 @@ defmodule MatrixServer.Event do
         },
         auth_events: Enum.map(auth_events, & &1.event_id)
     }
-
-    if generate_id, do: set_event_id(event), else: event
   end
 
-  def topic(room, sender, topic, auth_events, generate_id \\ true) do
-    event = %Event{
+  def topic(room, sender, topic, auth_events) do
+    %Event{
       new(room, sender)
       | type: "m.room.topic",
         state_key: "",
@@ -127,12 +116,10 @@ defmodule MatrixServer.Event do
         },
         auth_events: Enum.map(auth_events, & &1.event_id)
     }
-
-    if generate_id, do: set_event_id(event), else: event
   end
 
-  def join_rules(room, sender, join_rule, auth_events, generate_id \\ true) do
-    event = %Event{
+  def join_rules(room, sender, join_rule, auth_events) do
+    %Event{
       new(room, sender)
       | type: "m.room.join_rules",
         state_key: "",
@@ -141,12 +128,10 @@ defmodule MatrixServer.Event do
         },
         auth_events: Enum.map(auth_events, & &1.event_id)
     }
-
-    if generate_id, do: set_event_id(event), else: event
   end
 
-  def history_visibility(room, sender, history_visibility, auth_events, generate_id \\ true) do
-    event = %Event{
+  def history_visibility(room, sender, history_visibility, auth_events) do
+    %Event{
       new(room, sender)
       | type: "m.room.history_visibility",
         state_key: "",
@@ -155,12 +140,10 @@ defmodule MatrixServer.Event do
         },
         auth_events: Enum.map(auth_events, & &1.event_id)
     }
-
-    if generate_id, do: set_event_id(event), else: event
   end
 
-  def guest_access(room, sender, guest_access, auth_events, generate_id \\ true) do
-    event = %Event{
+  def guest_access(room, sender, guest_access, auth_events) do
+    %Event{
       new(room, sender)
       | type: "m.room.guest_access",
         state_key: "",
@@ -169,8 +152,6 @@ defmodule MatrixServer.Event do
         },
         auth_events: Enum.map(auth_events, & &1.event_id)
     }
-
-    if generate_id, do: set_event_id(event), else: event
   end
 
   def is_control_event(%Event{type: "m.room.power_levels", state_key: ""}), do: true
@@ -294,28 +275,15 @@ defmodule MatrixServer.Event do
     end)
   end
 
-  def sign(event) do
-    content_hash =
-      event
-      |> calculate_content_hash()
-      |> MatrixServer.encode_unpadded_base64()
-
-    event
-    |> Map.put(:hashes, %{"sha256" => content_hash})
-    |> redact()
-    |> KeyServer.sign_object()
-  end
-
   defp calculate_content_hash(event) do
     m =
       event
       |> MatrixServer.to_serializable_map()
       |> Map.drop([:unsigned, :signature, :hashes])
       |> EncodableMap.from_map()
-      |> Jason.encode()
 
     with {:ok, json} <- Jason.encode(m) do
-      :crypto.hash(:sha256, json)
+      {:ok, :crypto.hash(:sha256, json)}
     end
   end
 
@@ -366,6 +334,22 @@ defmodule MatrixServer.Event do
       ])
 
   defp redact_content(_, _), do: %{}
+
+  # Adds content hash, adds signature and calculates event id.
+  def post_process(event) do
+    with {:ok, content_hash} <- calculate_content_hash(event) do
+      encoded_hash = MatrixServer.encode_unpadded_base64(content_hash)
+      event = %Event{event | hashes: %{"sha256" => encoded_hash}}
+
+      with {:ok, sig, key_id} <- KeyServer.sign_object(redact(event)) do
+        event = %Event{event | signatures: %{MatrixServer.server_name() => %{key_id => sig}}}
+
+        with {:ok, event} <- set_event_id(event) do
+          {:ok, event}
+        end
+      end
+    end
+  end
 
   def set_event_id(event) do
     with {:ok, event_id} <- generate_event_id(event) do
