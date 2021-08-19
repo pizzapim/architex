@@ -5,7 +5,8 @@ defmodule MatrixServerWeb.Federation.QueryController do
   import MatrixServerWeb.Error
   import Ecto.Query
 
-  alias MatrixServer.{Repo, Account, Identifier}
+  alias MatrixServer.{Repo, Account}
+  alias MatrixServer.Types.UserId
 
   defmodule ProfileRequest do
     use Ecto.Schema
@@ -14,7 +15,7 @@ defmodule MatrixServerWeb.Federation.QueryController do
 
     @primary_key false
     embedded_schema do
-      field :user_id, Identifier
+      field :user_id, UserId
       field :field, :string
     end
 
@@ -31,8 +32,7 @@ defmodule MatrixServerWeb.Federation.QueryController do
   end
 
   def profile(conn, params) do
-    with {:ok,
-          %ProfileRequest{user_id: %Identifier{type: :user, localpart: localpart, domain: domain}}} <-
+    with {:ok, %ProfileRequest{user_id: %UserId{localpart: localpart, domain: domain}}} <-
            ProfileRequest.validate(params) do
       if domain == MatrixServer.server_name() do
         case Repo.one(from a in Account, where: a.localpart == ^localpart) do

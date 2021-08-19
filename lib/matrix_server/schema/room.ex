@@ -8,10 +8,10 @@ defmodule MatrixServer.Room do
   alias MatrixServerWeb.Client.Request.CreateRoom
 
   @type t :: %__MODULE__{
-    visibility: :public | :private,
-    state: list(list(String.t())),
-    forward_extremities: list(String.t())
-  }
+          visibility: :public | :private,
+          state: list(list(String.t())),
+          forward_extremities: list(String.t())
+        }
 
   @primary_key {:id, :string, []}
   schema "rooms" do

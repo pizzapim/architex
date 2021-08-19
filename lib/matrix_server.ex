@@ -2,6 +2,9 @@ defmodule MatrixServer do
   alias MatrixServer.EncodableMap
 
   @random_string_alphabet Enum.into(?a..?z, []) ++ Enum.into(?A..?Z, [])
+  @ipv6_regex ~r/^\[(?<ip>[^\]]+)\](?<port>:\d{1,5})?$/
+  @ipv4_regex ~r/^(?<hostname>[^:]+)(?<port>:\d{1,5})?$/
+  @dns_regex ~r/^[[:alnum:]-.]{1,255}$/
 
   @spec get_mxid(String.t()) :: String.t()
   def get_mxid(localpart) when is_binary(localpart) do
@@ -110,7 +113,8 @@ defmodule MatrixServer do
     %{object | signatures: new_sigs}
   end
 
-  @spec validate_change_simple(Ecto.Changeset.t(), atom(), (term() -> boolean())) :: Ecto.Changeset.t()
+  @spec validate_change_simple(Ecto.Changeset.t(), atom(), (term() -> boolean())) ::
+          Ecto.Changeset.t()
   def validate_change_simple(changeset, field, func) do
     augmented_func = fn _, val ->
       if func.(val), do: [], else: [{field, "invalid"}]
@@ -145,5 +149,36 @@ defmodule MatrixServer do
     |> encode_unpadded_base64()
     |> String.replace("+", "-")
     |> String.replace("/", "_")
+  end
+
+  @spec valid_domain?(String.t()) :: boolean()
+  def valid_domain?(domain) do
+    if String.starts_with?(domain, "[") do
+      # Parse as ipv6.
+      with %{"ip" => ip} <-
+             Regex.named_captures(@ipv6_regex, domain),
+           {:ok, _} <- :inet.parse_address(String.to_charlist(ip)) do
+        true
+      else
+        _ -> false
+      end
+    else
+      # Parse as ipv4 or dns name.
+      case Regex.named_captures(@ipv4_regex, domain) do
+        nil ->
+          false
+
+        %{"hostname" => hostname} ->
+          # Try to parse as ipv4.
+          case String.to_charlist(hostname) |> :inet.parse_address() do
+            {:ok, _} ->
+              true
+
+            {:error, _} ->
+              # Try to parse as dns name.
+              Regex.match?(@dns_regex, hostname)
+          end
+      end
+    end
   end
 end

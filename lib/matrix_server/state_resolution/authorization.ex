@@ -204,8 +204,8 @@ defmodule MatrixServer.StateResolution.Authorization do
   defp get_action_power_level(:invite, _), do: 50
   defp get_action_power_level(:ban, %{"ban" => pl}), do: pl
   defp get_action_power_level(:ban, _), do: 50
-  defp get_action_power_level(:redact, %{"redact" => pl}), do: pl
-  defp get_action_power_level(:redact, _), do: 50
+  # defp get_action_power_level(:redact, %{"redact" => pl}), do: pl
+  # defp get_action_power_level(:redact, _), do: 50
   defp get_action_power_level(:kick, %{"kick" => pl}), do: pl
   defp get_action_power_level(:kick, _), do: 50
 

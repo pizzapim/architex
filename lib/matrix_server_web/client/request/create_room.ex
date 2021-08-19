@@ -6,14 +6,14 @@ defmodule MatrixServerWeb.Client.Request.CreateRoom do
   alias Ecto.Changeset
 
   @type t :: %__MODULE__{
-    visibility: String.t(),
-    room_alias_name: String.t(),
-    name: String.t(),
-    topic: String.t(),
-    invite: list(String.t()),
-    room_version: String.t(),
-    preset: String.t()
-  }
+          visibility: String.t(),
+          room_alias_name: String.t(),
+          name: String.t(),
+          topic: String.t(),
+          invite: list(String.t()),
+          room_version: String.t(),
+          preset: String.t()
+        }
 
   @primary_key false
   embedded_schema do

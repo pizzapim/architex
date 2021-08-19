@@ -43,7 +43,11 @@ defmodule MatrixServer.RoomServer do
     end
   end
 
-  @spec create_room(pid(), MatrixServer.Account.t(), MatrixServerWeb.Client.Request.CreateRoom.t()) :: {:ok, String.t()} | {:error, atom()}
+  @spec create_room(
+          pid(),
+          MatrixServer.Account.t(),
+          MatrixServerWeb.Client.Request.CreateRoom.t()
+        ) :: {:ok, String.t()} | {:error, atom()}
   def create_room(pid, account, input) do
     GenServer.call(pid, {:create_room, account, input})
   end

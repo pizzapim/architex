@@ -8,8 +8,8 @@ defmodule MatrixServer.Account do
   alias Ecto.Multi
 
   @type t :: %__MODULE__{
-    password_hash: String.t()
-  }
+          password_hash: String.t()
+        }
 
   @max_mxid_length 255
 

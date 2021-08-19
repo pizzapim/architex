@@ -11,7 +11,10 @@ defmodule MatrixServer.MixProject do
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
       deps: deps(),
-      dialyzer: [plt_add_deps: :app_tree]
+      dialyzer: [
+        plt_add_deps: :app_tree,
+        flags: [:error_handling, :race_conditions, :underspecs, :unknown, :unmatched_returns]
+      ]
     ]
   end
 
