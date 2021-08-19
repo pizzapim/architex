@@ -17,7 +17,7 @@ defmodule MatrixServer.Types.RoomId do
     with "!" <> rest <- s,
          [localpart, domain] <- String.split(rest, ":", parts: 2) do
       if MatrixServer.valid_domain?(domain) do
-        %RoomId{localpart: localpart, domain: domain}
+        {:ok, %RoomId{localpart: localpart, domain: domain}}
       else
         :error
       end
@@ -32,11 +32,11 @@ defmodule MatrixServer.Types.RoomId do
     "!" <> rest = s
     [localpart, domain] = String.split(rest, ":", parts: 2)
 
-    %RoomId{localpart: localpart, domain: domain}
+    {:ok, %RoomId{localpart: localpart, domain: domain}}
   end
 
   def load(_), do: :error
 
-  def dump(%RoomId{} = room_id), do: to_string(room_id)
+  def dump(%RoomId{} = room_id), do: {:ok, to_string(room_id)}
   def dump(_), do: :error
 end

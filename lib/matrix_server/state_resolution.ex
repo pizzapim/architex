@@ -4,6 +4,8 @@ defmodule MatrixServer.StateResolution do
   alias MatrixServer.{Repo, Event, Room}
   alias MatrixServer.StateResolution.Authorization
 
+  @type state_set :: map()
+
   def resolve(event), do: resolve(event, true)
 
   def resolve(%Event{room_id: room_id} = event, apply_state) do
@@ -191,7 +193,7 @@ defmodule MatrixServer.StateResolution do
 
     # TODO: refactor
     case room_events[pl_event_id] do
-      %Event{content: %{"users" => pl_users}} -> Map.get(pl_users, sender, 0)
+      %Event{content: %{"users" => pl_users}} -> Map.get(pl_users, to_string(sender), 0)
       nil -> 0
     end
   end

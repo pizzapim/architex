@@ -3,7 +3,12 @@ defmodule MatrixServer.StateResolution.Authorization do
   import Ecto.Query
 
   alias MatrixServer.{Repo, Event}
+  alias MatrixServer.Types.UserId
+  alias MatrixServer.StateResolution, as: StateRes
 
+  @typep action :: :invite | :ban | :redact | :kick | {:event, Event.t()}
+
+  @spec authorized?(Event.t(), StateRes.state_set()) :: boolean()
   def authorized?(%Event{type: "m.room.create", prev_events: prev_events}, %{}),
     do: prev_events == []
 
@@ -18,7 +23,7 @@ defmodule MatrixServer.StateResolution.Authorization do
         state_set
       ) do
     join_rule = get_join_rule(state_set)
-    membership = get_membership(sender, state_set)
+    membership = get_membership(to_string(sender), state_set)
 
     # Check rules: 5.2.3, 5.2.4, 5.2.5
     cond do
@@ -48,7 +53,7 @@ defmodule MatrixServer.StateResolution.Authorization do
         },
         state_set
       ) do
-    sender_membership = get_membership(sender, state_set)
+    sender_membership = get_membership(to_string(sender), state_set)
     target_membership = get_membership(state_key, state_set)
     power_levels = get_power_levels(state_set)
 
@@ -56,7 +61,7 @@ defmodule MatrixServer.StateResolution.Authorization do
     cond do
       sender_membership != "join" -> false
       target_membership in ["join", "ban"] -> false
-      has_power_level(sender, power_levels, :invite) -> true
+      has_power_level?(to_string(sender), power_levels, :invite) -> true
       true -> false
     end
   end
@@ -71,7 +76,7 @@ defmodule MatrixServer.StateResolution.Authorization do
         state_set
       ) do
     # Check rule: 5.4.1
-    get_membership(sender, state_set) in ["invite", "join"]
+    get_membership(to_string(sender), state_set) in ["invite", "join"]
   end
 
   def authorized?(
@@ -83,18 +88,25 @@ defmodule MatrixServer.StateResolution.Authorization do
         },
         state_set
       ) do
-    sender_membership = get_membership(sender, state_set)
+    sender_membership = get_membership(to_string(sender), state_set)
     target_membership = get_membership(state_key, state_set)
     power_levels = get_power_levels(state_set)
-    sender_pl = get_user_power_level(sender, power_levels)
+    sender_pl = get_user_power_level(to_string(sender), power_levels)
     target_pl = get_user_power_level(state_key, power_levels)
 
     # Check rules: 5.4.2, 5.4.3, 5.4.4
     cond do
-      sender_membership != "join" -> false
-      target_membership == "ban" and not has_power_level(sender, power_levels, :ban) -> false
-      has_power_level(sender, power_levels, :kick) and target_pl < sender_pl -> true
-      true -> false
+      sender_membership != "join" ->
+        false
+
+      target_membership == "ban" and not has_power_level?(to_string(sender), power_levels, :ban) ->
+        false
+
+      has_power_level?(to_string(sender), power_levels, :kick) and target_pl < sender_pl ->
+        true
+
+      true ->
+        false
     end
   end
 
@@ -107,15 +119,15 @@ defmodule MatrixServer.StateResolution.Authorization do
         },
         state_set
       ) do
-    sender_membership = get_membership(sender, state_set)
+    sender_membership = get_membership(to_string(sender), state_set)
     power_levels = get_power_levels(state_set)
-    sender_pl = get_user_power_level(sender, power_levels)
+    sender_pl = get_user_power_level(to_string(sender), power_levels)
     target_pl = get_user_power_level(state_key, power_levels)
 
     # Check rules: 5.5.1, 5.5.2
     cond do
       sender_membership != "join" -> false
-      has_power_level(sender, power_levels, :ban) and target_pl < sender_pl -> true
+      has_power_level?(to_string(sender), power_levels, :ban) and target_pl < sender_pl -> true
       true -> false
     end
   end
@@ -125,14 +137,15 @@ defmodule MatrixServer.StateResolution.Authorization do
 
   def authorized?(%Event{sender: sender} = event, state_set) do
     # Check rule: 6
-    get_membership(sender, state_set) == "join" and _authorized?(event, state_set)
+    get_membership(to_string(sender), state_set) == "join" and _authorized?(event, state_set)
   end
 
+  @spec _authorized?(Event.t(), StateRes.state_set()) :: boolean()
   defp _authorized?(%Event{type: "m.room.third_party_invite", sender: sender}, state_set) do
     power_levels = get_power_levels(state_set)
     # Check rule: 7.1
 
-    has_power_level(sender, power_levels, :invite)
+    has_power_level?(to_string(sender), power_levels, :invite)
   end
 
   defp _authorized?(%Event{state_key: state_key, sender: sender} = event, state_set) do
@@ -140,19 +153,20 @@ defmodule MatrixServer.StateResolution.Authorization do
 
     # Check rules: 8, 9
     cond do
-      not has_power_level(sender, power_levels, {:event, event}) -> false
+      not has_power_level?(to_string(sender), power_levels, {:event, event}) -> false
       String.starts_with?(state_key, "@") and state_key != sender -> false
       true -> __authorized?(event, state_set)
     end
   end
 
+  @spec __authorized?(Event.t(), StateRes.state_set()) :: boolean()
   defp __authorized?(
          %Event{type: "m.room.power_levels", sender: sender, content: content},
          state_set
        ) do
     current_pls = get_power_levels(state_set)
     new_pls = content
-    sender_pl = get_user_power_level(sender, new_pls)
+    sender_pl = get_user_power_level(to_string(sender), new_pls)
 
     # Check rules: 10.2, 10.3, 10.4, 10.5
     cond do
@@ -166,40 +180,43 @@ defmodule MatrixServer.StateResolution.Authorization do
 
   defp __authorized?(_, _), do: true
 
+  @spec get_power_levels(StateRes.state_set()) :: map() | nil
   defp get_power_levels(state_set) do
-    case state_set[{"m.room.power_levels", ""}] do
-      %Event{content: content} -> content
-      nil -> nil
+    with %Event{content: content} <- state_set[{"m.room.power_levels", ""}] do
+      content
     end
   end
 
+  @spec get_join_rule(StateRes.state_set()) :: String.t() | nil
   defp get_join_rule(state_set) do
-    case state_set[{"m.room.join_rules", ""}] do
-      %Event{content: %{"join_rule" => join_rule}} -> join_rule
-      nil -> nil
+    with %Event{content: %{"join_rule" => join_rule}} <- state_set[{"m.room.join_rules", ""}] do
+      join_rule
     end
   end
 
+  @spec get_membership(String.t(), StateRes.state_set()) :: String.t() | nil
   defp get_membership(user, state_set) do
-    case state_set[{"m.room.member", user}] do
-      %Event{content: %{"membership" => membership}} -> membership
-      nil -> nil
+    with %Event{content: %{"membership" => membership}} <- state_set[{"m.room.member", user}] do
+      membership
     end
   end
 
-  defp has_power_level(user, power_levels, action) do
+  @spec has_power_level?(String.t(), map() | nil, action()) :: boolean()
+  defp has_power_level?(user, power_levels, action) do
     user_pl = get_user_power_level(user, power_levels)
     action_pl = get_action_power_level(action, power_levels)
 
     user_pl >= action_pl
   end
 
+  @spec get_user_power_level(String.t(), map() | nil) :: non_neg_integer()
   defp get_user_power_level(user, %{"users" => users}) when is_map_key(users, user),
     do: users[user]
 
   defp get_user_power_level(_, %{"users_default" => pl}), do: pl
   defp get_user_power_level(_, _), do: 0
 
+  @spec get_action_power_level(action(), map() | nil) :: non_neg_integer()
   defp get_action_power_level(:invite, %{"invite" => pl}), do: pl
   defp get_action_power_level(:invite, _), do: 50
   defp get_action_power_level(:ban, %{"ban" => pl}), do: pl
@@ -218,7 +235,7 @@ defmodule MatrixServer.StateResolution.Authorization do
       case power_levels do
         %{"state_default" => pl} -> pl
         %{} -> 50
-        _ -> 0
+        nil -> 0
       end
     else
       case power_levels do
@@ -228,6 +245,9 @@ defmodule MatrixServer.StateResolution.Authorization do
     end
   end
 
+  # TODO: Power_levels may not have all these keys defined.
+  @spec authorize_power_levels(UserId.t(), non_neg_integer(), map() | nil, map() | nil) ::
+          boolean()
   defp authorize_power_levels(
          user,
          user_pl,
@@ -239,9 +259,12 @@ defmodule MatrixServer.StateResolution.Authorization do
     valid_power_level_key_changes(Map.take(current_pls, keys), Map.take(new_pls, keys), user_pl) and
       valid_power_level_key_changes(current_events, new_events, user_pl) and
       valid_power_level_key_changes(current_users, new_users, user_pl) and
-      valid_power_level_users_changes(current_users, new_users, user, user_pl)
+      valid_power_level_users_changes(current_users, new_users, to_string(user), user_pl)
   end
 
+  defp authorize_power_levels(_, _, _, _), do: false
+
+  @spec valid_power_level_key_changes(map(), map(), non_neg_integer()) :: boolean()
   defp valid_power_level_key_changes(l1, l2, user_pl) do
     set1 = MapSet.new(l1)
     set2 = MapSet.new(l2)

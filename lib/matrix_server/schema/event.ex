@@ -4,13 +4,28 @@ defmodule MatrixServer.Event do
   import Ecto.Query
 
   alias MatrixServer.{Repo, Room, Event, Account, EncodableMap, KeyServer}
+  alias MatrixServer.Types.UserId
+
+  # TODO: Could refactor to also always set prev_events, but not necessary.
+  @type t :: %__MODULE__{
+          type: String.t(),
+          origin_server_ts: DateTime.t(),
+          state_key: String.t(),
+          sender: UserId.t(),
+          content: map(),
+          prev_events: [String.t()] | nil,
+          auth_events: [String.t()],
+          unsigned: map() | nil,
+          signatures: map() | nil,
+          hashes: map() | nil
+        }
 
   @primary_key {:event_id, :string, []}
   schema "events" do
     field :type, :string
     field :origin_server_ts, :utc_datetime_usec
     field :state_key, :string
-    field :sender, :string
+    field :sender, UserId
     field :content, :map
     field :prev_events, {:array, :string}
     field :auth_events, {:array, :string}
@@ -21,16 +36,18 @@ defmodule MatrixServer.Event do
     belongs_to :room, Room, type: :string
   end
 
+  @spec new(Room.t(), Account.t()) :: %Event{}
   def new(%Room{id: room_id}, %Account{localpart: localpart}) do
     %Event{
       room_id: room_id,
-      sender: MatrixServer.get_mxid(localpart),
+      sender: %UserId{localpart: localpart, domain: MatrixServer.server_name()},
       origin_server_ts: DateTime.utc_now(),
       prev_events: [],
       auth_events: []
     }
   end
 
+  @spec create_room(Room.t(), Account.t(), String.t()) :: t()
   def create_room(
         room,
         %Account{localpart: localpart} = creator,
@@ -49,6 +66,7 @@ defmodule MatrixServer.Event do
     }
   end
 
+  @spec join(Room.t(), Account.t(), [t()]) :: t()
   def join(room, %Account{localpart: localpart} = sender, auth_events) do
     mxid = MatrixServer.get_mxid(localpart)
 
@@ -63,6 +81,7 @@ defmodule MatrixServer.Event do
     }
   end
 
+  @spec power_levels(Room.t(), Account.t(), [t()]) :: t()
   def power_levels(
         room,
         %Account{localpart: localpart} = sender,
@@ -94,6 +113,7 @@ defmodule MatrixServer.Event do
     }
   end
 
+  @spec name(Room.t(), Account.t(), String.t(), [t()]) :: %Event{}
   def name(room, sender, name, auth_events) do
     %Event{
       new(room, sender)
@@ -106,6 +126,7 @@ defmodule MatrixServer.Event do
     }
   end
 
+  @spec topic(Room.t(), Account.t(), String.t(), [t()]) :: t()
   def topic(room, sender, topic, auth_events) do
     %Event{
       new(room, sender)
@@ -118,6 +139,7 @@ defmodule MatrixServer.Event do
     }
   end
 
+  @spec join_rules(Room.t(), Account.t(), String.t(), [t()]) :: t()
   def join_rules(room, sender, join_rule, auth_events) do
     %Event{
       new(room, sender)
@@ -130,6 +152,7 @@ defmodule MatrixServer.Event do
     }
   end
 
+  @spec history_visibility(Room.t(), Account.t(), String.t(), [t()]) :: t()
   def history_visibility(room, sender, history_visibility, auth_events) do
     %Event{
       new(room, sender)
@@ -142,6 +165,7 @@ defmodule MatrixServer.Event do
     }
   end
 
+  @spec guest_access(Room.t(), Account.t(), String.t(), [t()]) :: t()
   def guest_access(room, sender, guest_access, auth_events) do
     %Event{
       new(room, sender)
@@ -154,6 +178,7 @@ defmodule MatrixServer.Event do
     }
   end
 
+  @spec is_control_event(t()) :: boolean()
   def is_control_event(%Event{type: "m.room.power_levels", state_key: ""}), do: true
   def is_control_event(%Event{type: "m.room.join_rules", state_key: ""}), do: true
 
@@ -162,12 +187,13 @@ defmodule MatrixServer.Event do
         state_key: state_key,
         sender: sender,
         content: %{membership: membership}
-      })
-      when sender != state_key and membership in ["leave", "ban"],
-      do: true
+      }) do
+    to_string(sender) != state_key and membership in ["leave", "ban"]
+  end
 
   def is_control_event(_), do: false
 
+  @spec is_state_event(t()) :: boolean()
   def is_state_event(%Event{state_key: state_key}), do: state_key != nil
 
   # Perform validations that can be done before state resolution.
@@ -175,12 +201,13 @@ defmodule MatrixServer.Event do
   # We assume that required keys, as well as in the content, is already validated.
 
   # Rule 1.4 is left to changeset validation.
+  @spec prevalidate(t()) :: boolean()
   def prevalidate(%Event{
         type: "m.room.create",
         prev_events: prev_events,
         auth_events: auth_events,
         room_id: room_id,
-        sender: sender
+        sender: %UserId{domain: domain}
       }) do
     # TODO: error check on domains?
     # TODO: rule 1.3
@@ -188,7 +215,7 @@ defmodule MatrixServer.Event do
     # Check rules: 1.1, 1.2
     prev_events == [] and
       auth_events == [] and
-      MatrixServer.get_domain(sender) == MatrixServer.get_domain(room_id)
+      domain == MatrixServer.get_domain(room_id)
   end
 
   def prevalidate(%Event{auth_events: auth_event_ids, prev_events: prev_event_ids} = event) do
@@ -214,18 +241,27 @@ defmodule MatrixServer.Event do
   end
 
   # Rule 4.1 is left to changeset validation.
-  defp do_prevalidate(%Event{type: "m.room.aliases", sender: sender, state_key: state_key}, _, _) do
+  @spec do_prevalidate(t(), [t()], [t()]) :: boolean()
+  defp do_prevalidate(
+         %Event{type: "m.room.aliases", sender: %UserId{domain: domain}, state_key: state_key},
+         _,
+         _
+       ) do
     # Check rule: 4.2
-    MatrixServer.get_domain(sender) == MatrixServer.get_domain(state_key)
+    domain == MatrixServer.get_domain(state_key)
   end
 
   # Rule 5.1 is left to changeset validation.
   # Rules 5.2.3, 5.2.4, 5.2.5 is left to state resolution.
   # Check rule: 5.2.1
   defp do_prevalidate(
-         %Event{type: "m.room.member", content: %{"membership" => "join"}, sender: sender},
+         %Event{
+           type: "m.room.member",
+           content: %{"membership" => "join"},
+           sender: %UserId{localpart: localpart, domain: domain}
+         },
          _,
-         [%Event{type: "m.room.create", state_key: sender}]
+         [%Event{type: "m.room.create", state_key: %UserId{localpart: localpart, domain: domain}}]
        ),
        do: true
 
@@ -239,17 +275,20 @@ defmodule MatrixServer.Event do
          },
          _,
          _
-       )
-       when sender != state_key,
-       do: false
+       ) do
+    to_string(sender) == state_key
+  end
 
   # All other rules will be checked during state resolution.
   defp do_prevalidate(_, _, _), do: true
 
+  @spec valid_auth_events?(t(), [t()]) :: boolean()
   defp valid_auth_events?(
          %Event{type: type, sender: sender, state_key: state_key, content: content},
          auth_events
        ) do
+    sender = to_string(sender)
+
     Enum.all?(auth_events, fn
       %Event{type: "m.room.create", state_key: ""} ->
         true
@@ -275,6 +314,7 @@ defmodule MatrixServer.Event do
     end)
   end
 
+  @spec calculate_content_hash(t()) :: {:ok, binary()} | {:error, Jason.EncodeError.t()}
   defp calculate_content_hash(event) do
     m =
       event
@@ -287,6 +327,7 @@ defmodule MatrixServer.Event do
     end
   end
 
+  @spec redact(t()) :: map()
   defp redact(%Event{type: type, content: content} = event) do
     redacted_event =
       event
@@ -312,6 +353,7 @@ defmodule MatrixServer.Event do
     %{redacted_event | content: redact_content(type, content)}
   end
 
+  @spec redact_content(String.t(), map()) :: map()
   defp redact_content("m.room.member", content), do: Map.take(content, ["membership"])
   defp redact_content("m.room.create", content), do: Map.take(content, ["creator"])
   defp redact_content("m.room.join_rules", content), do: Map.take(content, ["join_rule"])
@@ -336,6 +378,7 @@ defmodule MatrixServer.Event do
   defp redact_content(_, _), do: %{}
 
   # Adds content hash, adds signature and calculates event id.
+  @spec post_process(t()) :: {:ok, t()} | :error
   def post_process(event) do
     with {:ok, content_hash} <- calculate_content_hash(event) do
       encoded_hash = MatrixServer.encode_unpadded_base64(content_hash)
@@ -346,23 +389,30 @@ defmodule MatrixServer.Event do
 
         with {:ok, event} <- set_event_id(event) do
           {:ok, event}
+        else
+          _ -> :error
         end
       end
+    else
+      _ -> :error
     end
   end
 
+  @spec set_event_id(t()) :: {:ok, t()} | {:error, Jason.EncodeError.t()}
   def set_event_id(event) do
     with {:ok, event_id} <- generate_event_id(event) do
       {:ok, %Event{event | event_id: event_id}}
     end
   end
 
+  @spec generate_event_id(t()) :: {:ok, String.t()} | {:error, Jason.EncodeError.t()}
   defp generate_event_id(event) do
     with {:ok, hash} <- calculate_reference_hash(event) do
       {:ok, "$" <> MatrixServer.encode_url_safe_base64(hash)}
     end
   end
 
+  @spec calculate_reference_hash(t()) :: {:ok, binary()} | {:error, Jason.EncodeError.t()}
   defp calculate_reference_hash(event) do
     redacted_event =
       event

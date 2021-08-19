@@ -18,7 +18,7 @@ defmodule MatrixServer.Types.EventId do
   def cast(s) when is_binary(s) do
     with "$" <> id <- s do
       if Regex.match?(@id_regex, id) do
-        %EventId{id: id}
+        {:ok, %EventId{id: id}}
       else
         :error
       end
@@ -32,11 +32,11 @@ defmodule MatrixServer.Types.EventId do
   def load(s) when is_binary(s) do
     "$" <> rest = s
 
-    %EventId{id: rest}
+    {:ok, %EventId{id: rest}}
   end
 
   def load(_), do: :error
 
-  def dump(%EventId{} = event_id), do: to_string(event_id)
+  def dump(%EventId{} = event_id), do: {:ok, to_string(event_id)}
   def dump(_), do: :error
 end
