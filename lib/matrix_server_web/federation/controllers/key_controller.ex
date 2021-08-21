@@ -20,7 +20,7 @@ defmodule MatrixServerWeb.Federation.KeyController do
       server_name: MatrixServer.server_name(),
       verify_keys: keys,
       old_verify_keys: %{},
-      valid_until_ts: valid_until
+      valid_until_ts: DateTime.to_unix(valid_until, :millisecond)
     }
 
     case KeyServer.sign_object(data) do

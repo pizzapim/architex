@@ -38,7 +38,6 @@ defmodule MatrixServer do
     end
   end
 
-  # TODO Eventually move to regex with named captures.
   @spec get_localpart(String.t()) :: String.t() | nil
   def get_localpart(id) do
     with [part, _] <- String.split(id, ":", parts: 2),
@@ -85,17 +84,25 @@ defmodule MatrixServer do
   # https://stackoverflow.com/questions/41523762/41671211
   @spec to_serializable_map(struct()) :: map()
   def to_serializable_map(struct) do
-    association_fields = struct.__struct__.__schema__(:associations)
+    association_fields =
+      if Kernel.function_exported?(struct.__struct__, :__schema__, 1) do
+        struct.__struct__.__schema__(:associations)
+      else
+        []
+      end
+
     waste_fields = association_fields ++ [:__meta__]
 
     struct
     |> Map.from_struct()
-    |> Map.drop(waste_fields)
+    |> Enum.reject(fn {k, v} ->
+      is_nil(v) or k in waste_fields
+    end)
+    |> Enum.into(%{})
   end
 
   @spec serialize_and_encode(struct()) :: {:ok, String.t()} | {:error, Jason.EncodeError.t()}
   def serialize_and_encode(struct) do
-    # TODO: handle nil values in struct?
     struct
     |> to_serializable_map()
     |> encode_canonical_json()

@@ -29,7 +29,9 @@ defmodule MatrixServerWeb.Federation.HTTPClient do
     with {:ok,
           %GetSigningKeys{server_name: server_name, verify_keys: verify_keys, signatures: sigs} =
             response} <- tesla_request(:get, client, path, GetSigningKeys),
-         {:ok, encoded_body} <- MatrixServer.serialize_and_encode(response),
+         serializable_response <- MatrixServer.to_serializable_map(response),
+         serializable_response <- Map.drop(serializable_response, [:signatures]),
+         {:ok, encoded_body} <- MatrixServer.encode_canonical_json(serializable_response),
          server_sigs when not is_nil(server_sigs) <- sigs[server_name] do
       # For each verify key, check if there is a matching signature.
       # If not, invalidate the whole response.
@@ -58,12 +60,20 @@ defmodule MatrixServerWeb.Federation.HTTPClient do
     Tesla.get(client, path)
   end
 
+  def get_event(client, event_id) do
+    path = RouteHelpers.event_path(Endpoint, :event, event_id)
+
+    Tesla.get(client, path)
+  end
+
   defp tesla_request(method, client, path, request_schema) do
     with {:ok, %Tesla.Env{body: body}} <- Tesla.request(client, url: path, method: method),
          %Ecto.Changeset{valid?: true} = cs <- apply(request_schema, :changeset, [body]) do
       {:ok, Ecto.Changeset.apply_changes(cs)}
     else
-      _ -> :error
+      x ->
+        IO.inspect(x)
+        :error
     end
   end
 end

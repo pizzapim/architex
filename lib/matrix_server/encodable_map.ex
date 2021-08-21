@@ -1,6 +1,6 @@
 # https://github.com/michalmuskala/jason/issues/69
 defmodule MatrixServer.EncodableMap do
-  alias MatrixServer.EncodableMap
+  alias MatrixServer.{EncodableMap, Event}
   alias MatrixServer.Types.{UserId, RoomId, EventId, GroupId, AliasId}
 
   defstruct pairs: []
@@ -15,12 +15,10 @@ defmodule MatrixServer.EncodableMap do
     pairs =
       map
       |> Enum.map(fn
-        {k, v} when is_struct(v, DateTime) ->
-          {k, DateTime.to_unix(v, :millisecond)}
-
         {k, v}
         when is_struct(v, UserId) or is_struct(v, RoomId) or is_struct(v, EventId) or
                is_struct(v, GroupId) or is_struct(v, AliasId) ->
+          # Simply convert IDs to a string.
           {k, to_string(v)}
 
         {k, v} when is_map(v) ->

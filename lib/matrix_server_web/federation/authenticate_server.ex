@@ -12,8 +12,18 @@ defmodule MatrixServerWeb.Federation.AuthenticateServer do
         method: method,
         query_string: query_string
       }) do
+    # TODO: This will break if request ends with '?'.
+    uri = URI.decode_www_form(path)
+
+    uri =
+      if String.length(query_string) > 0 do
+        uri <> "?" <> URI.decode_www_form(query_string)
+      else
+        uri
+      end
+
     object_to_sign = %{
-      uri: path <> "?" <> URI.decode_www_form(query_string),
+      uri: uri,
       method: method,
       destination: MatrixServer.server_name()
     }
@@ -39,6 +49,7 @@ defmodule MatrixServerWeb.Federation.AuthenticateServer do
              ServerKeyInfo.with_fresh_signing_keys(origin) do
         Enum.find_value(keys, false, fn %SigningKey{signing_key: signing_key} ->
           with {:ok, decoded_key} <- MatrixServer.decode_base64(signing_key) do
+            IO.puts(encoded_object)
             MatrixServer.sign_verify(raw_sig, encoded_object, decoded_key)
           else
             _ -> false

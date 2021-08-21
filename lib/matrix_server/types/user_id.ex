@@ -18,6 +18,12 @@ defmodule MatrixServer.Types.UserId do
     end
   end
 
+  defimpl Jason.Encoder, for: UserId do
+    def encode(user_id, opts) do
+      Jason.Encode.string(to_string(user_id), opts)
+    end
+  end
+
   def type(), do: :string
 
   def cast(s) when is_binary(s) do

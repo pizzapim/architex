@@ -18,6 +18,9 @@ defmodule MatrixServer.RoomServer do
     GenServer.start_link(__MODULE__, opts, name: name)
   end
 
+  @spec get_room_server(Room.t()) :: {:error, :not_found} | DynamicSupervisor.on_start_child()
+  def get_room_server(%Room{id: room_id}), do: get_room_server(room_id)
+
   # Get room server pid, or spin one up for the room.
   # If the room does not exist, return an error.
   @spec get_room_server(String.t()) :: {:error, :not_found} | DynamicSupervisor.on_start_child()

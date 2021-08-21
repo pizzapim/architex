@@ -10,7 +10,7 @@ defmodule MatrixServer.ServerKeyInfo do
 
   @primary_key {:server_name, :string, []}
   schema "server_key_info" do
-    field :valid_until, :utc_datetime
+    field :valid_until, :integer
 
     has_many :signing_keys, SigningKey, foreign_key: :server_name
   end
@@ -43,7 +43,7 @@ defmodule MatrixServer.ServerKeyInfo do
             verify_keys: verify_keys,
             valid_until_ts: valid_until_ts
           }} <- HTTPClient.get_signing_keys(client),
-         {:ok, valid_until} <- DateTime.from_unix(valid_until_ts) do
+         {:ok, valid_until} <- DateTime.from_unix(valid_until_ts, :millisecond) do
       signing_keys =
         Enum.map(verify_keys, fn {key_id, %{"key" => key}} ->
           [server_name: server_name, signing_key_id: key_id, signing_key: key]
@@ -52,7 +52,8 @@ defmodule MatrixServer.ServerKeyInfo do
       # Always check every week to prevent misuse.
       ski = %ServerKeyInfo{
         server_name: server_name,
-        valid_until: MatrixServer.min_datetime(in_a_week, valid_until)
+        valid_until:
+          MatrixServer.min_datetime(in_a_week, valid_until) |> DateTime.to_unix(:millisecond)
       }
 
       case upsert_multi(server_name, ski, signing_keys) |> Repo.transaction() do

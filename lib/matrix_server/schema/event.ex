@@ -9,7 +9,7 @@ defmodule MatrixServer.Event do
   # TODO: Could refactor to also always set prev_events, but not necessary.
   @type t :: %__MODULE__{
           type: String.t(),
-          origin_server_ts: DateTime.t(),
+          origin_server_ts: integer(),
           state_key: String.t(),
           sender: UserId.t(),
           content: map(),
@@ -23,7 +23,7 @@ defmodule MatrixServer.Event do
   @primary_key {:event_id, :string, []}
   schema "events" do
     field :type, :string
-    field :origin_server_ts, :utc_datetime_usec
+    field :origin_server_ts, :integer
     field :state_key, :string
     field :sender, UserId
     field :content, :map
@@ -36,12 +36,38 @@ defmodule MatrixServer.Event do
     belongs_to :room, Room, type: :string
   end
 
+  defimpl Jason.Encoder, for: Event do
+    @pdu_keys [
+      :auth_events,
+      :content,
+      :depth,
+      :hashes,
+      :origin,
+      :origin_server_ts,
+      :prev_events,
+      :redacts,
+      :room_id,
+      :sender,
+      :signatures,
+      :state_key,
+      :type,
+      :unsigned
+    ]
+
+    def encode(event, opts) do
+      event
+      |> Map.take(@pdu_keys)
+      |> Map.update!(:sender, &Kernel.to_string/1)
+      |> Jason.Encode.map(opts)
+    end
+  end
+
   @spec new(Room.t(), Account.t()) :: %Event{}
   def new(%Room{id: room_id}, %Account{localpart: localpart}) do
     %Event{
       room_id: room_id,
       sender: %UserId{localpart: localpart, domain: MatrixServer.server_name()},
-      origin_server_ts: DateTime.utc_now(),
+      origin_server_ts: DateTime.utc_now() |> DateTime.to_unix(:millisecond),
       prev_events: [],
       auth_events: []
     }
