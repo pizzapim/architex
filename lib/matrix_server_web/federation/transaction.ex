@@ -6,11 +6,11 @@ defmodule MatrixServerWeb.Federation.Transaction do
   @type edu :: any()
 
   @type t :: %__MODULE__{
-    origin: String.t(),
-    origin_server_ts: integer(),
-    pdus: [Event.t()],
-    edus: [edu()] | nil
-  }
+          origin: String.t(),
+          origin_server_ts: integer(),
+          pdus: [Event.t()],
+          edus: [edu()] | nil
+        }
 
   defstruct [:origin, :origin_server_ts, :pdus, :edus]
 

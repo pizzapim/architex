@@ -13,6 +13,7 @@ defmodule MatrixServerWeb.Error do
       {400, "M_INVALID_ROOM_STATE", "The request would leave the room in an invalid state."},
     unauthorized: {400, "M_UNAUTHORIZED", "The request was unauthorized."},
     invalid_param: {400, "M_INVALID_PARAM", "A request parameter was invalid."},
+    missing_param: {400, "M_MISSING_PARAM", "A request parameter is missing."},
     unknown_token: {401, "M_UNKNOWN_TOKEN", "Invalid access token."},
     missing_token: {401, "M_MISSING_TOKEN", "Access token required."},
     not_found: {404, "M_NOT_FOUND", "The requested resource was not found."},

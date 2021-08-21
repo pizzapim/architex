@@ -65,6 +65,7 @@ defmodule MatrixServerWeb.Router do
     scope "/v1" do
       get "/query/profile", QueryController, :profile
       get "/event/:event_id", EventController, :event
+      get "/state/:room_id", EventController, :state
     end
   end
 

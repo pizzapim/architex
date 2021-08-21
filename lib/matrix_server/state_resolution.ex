@@ -55,6 +55,12 @@ defmodule MatrixServer.StateResolution do
     |> do_resolve(room_events)
   end
 
+  def full_auth_chain(events, room_events) do
+    events
+    |> Enum.map(&auth_chain(&1, room_events))
+    |> Enum.reduce(MapSet.new(), &MapSet.union/2)
+  end
+
   defp do_resolve([], _), do: %{}
 
   defp do_resolve(state_sets, room_events) do
@@ -148,12 +154,6 @@ defmodule MatrixServer.StateResolution do
     auth_chain_intersection = Enum.reduce(full_auth_chains, MapSet.new(), &MapSet.intersection/2)
 
     MapSet.difference(auth_chain_union, auth_chain_intersection)
-  end
-
-  defp full_auth_chain(events, room_events) do
-    events
-    |> Enum.map(&auth_chain(&1, room_events))
-    |> Enum.reduce(MapSet.new(), &MapSet.union/2)
   end
 
   defp auth_chain(%Event{auth_events: auth_events}, room_events) do

@@ -25,11 +25,7 @@ defmodule MatrixServerWeb.Federation.EventController do
               |> put_status(200)
               |> json(data)
             else
-              put_error(
-                conn,
-                :unauthorized,
-                "Origin server is not allowed to see requested event."
-              )
+              put_error(conn, :unauthorized, "Origin server is not participating in room.")
             end
 
           _ ->
@@ -41,5 +37,44 @@ defmodule MatrixServerWeb.Federation.EventController do
     end
   end
 
-  def event(conn, _), do: put_error(conn, :bad_json)
+  def event(conn, _), do: put_error(conn, :missing_param)
+
+  def state(%Plug.Conn{assigns: %{origin: origin}} = conn, %{
+        "event_id" => event_id,
+        "room_id" => room_id
+      }) do
+    query =
+      Event
+      |> where([e], e.event_id == ^event_id and e.room_id == ^room_id)
+      |> preload(:room)
+
+    case Repo.one(query) do
+      %Event{room: room} = event ->
+        case RoomServer.get_room_server(room) do
+          {:ok, pid} ->
+            if RoomServer.server_in_room(pid, origin) do
+              {state_events, auth_chain} = RoomServer.get_state_at_event(pid, event)
+
+              data = %{
+                auth_chain: auth_chain,
+                pdus: state_events
+              }
+
+              conn
+              |> put_status(200)
+              |> json(data)
+            else
+              put_error(conn, :unauthorized, "Origin server is not participating in room.")
+            end
+
+          _ ->
+            put_error(conn, :unknown)
+        end
+
+      nil ->
+        put_error(conn, :not_found, "Event or room not found.")
+    end
+  end
+
+  def state(conn, _), do: put_error(conn, :missing_param)
 end

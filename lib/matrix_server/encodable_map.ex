@@ -1,6 +1,6 @@
 # https://github.com/michalmuskala/jason/issues/69
 defmodule MatrixServer.EncodableMap do
-  alias MatrixServer.{EncodableMap, Event}
+  alias MatrixServer.EncodableMap
   alias MatrixServer.Types.{UserId, RoomId, EventId, GroupId, AliasId}
 
   defstruct pairs: []

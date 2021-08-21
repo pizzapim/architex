@@ -60,6 +60,10 @@ defmodule MatrixServer.RoomServer do
     GenServer.call(pid, {:server_in_room, domain})
   end
 
+  def get_state_at_event(pid, event) do
+    GenServer.call(pid, {:get_state_at_event, event})
+  end
+
   ### Implementation
 
   @impl true
@@ -102,6 +106,26 @@ defmodule MatrixServer.RoomServer do
       end)
 
     {:reply, result, state}
+  end
+
+  def handle_call({:get_state_at_event, %Event{room_id: room_id} = event}, _from, state) do
+    room_events =
+      Event
+      |> where([e], e.room_id == ^room_id)
+      |> select([e], {e.event_id, e})
+      |> Repo.all()
+      |> Enum.into(%{})
+
+    state_set = StateResolution.resolve(event, false)
+    state_events = Map.values(state_set)
+
+    auth_chain =
+      state_set
+      |> Map.values()
+      |> StateResolution.full_auth_chain(room_events)
+      |> Enum.map(&room_events[&1])
+
+    {:reply, {state_events, auth_chain}, state}
   end
 
   defp create_room_insert_events(room, account, %CreateRoom{
