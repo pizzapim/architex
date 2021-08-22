@@ -18,7 +18,7 @@ defmodule MatrixServerWeb.Federation.EventController do
       %Event{room: room} = event ->
         case RoomServer.get_room_server(room) do
           {:ok, pid} ->
-            if RoomServer.server_in_room(pid, origin) do
+            if RoomServer.server_in_room?(pid, origin) do
               data = Transaction.new([event])
 
               conn
@@ -57,7 +57,13 @@ defmodule MatrixServerWeb.Federation.EventController do
 
   def state_ids(conn, _), do: put_error(conn, :missing_param)
 
-  @spec get_state_or_state_ids(Plug.Conn.t(), :state | :state_ids, String.t(), String.t(), String.t()) :: Plug.Conn.t()
+  @spec get_state_or_state_ids(
+          Plug.Conn.t(),
+          :state | :state_ids,
+          String.t(),
+          String.t(),
+          String.t()
+        ) :: Plug.Conn.t()
   defp get_state_or_state_ids(conn, state_or_state_ids, origin, event_id, room_id) do
     query =
       Event
@@ -68,7 +74,7 @@ defmodule MatrixServerWeb.Federation.EventController do
       %Event{room: room} = event ->
         case RoomServer.get_room_server(room) do
           {:ok, pid} ->
-            if RoomServer.server_in_room(pid, origin) do
+            if RoomServer.server_in_room?(pid, origin) do
               {state_events, auth_chain} =
                 case state_or_state_ids do
                   :state -> RoomServer.get_state_at_event(pid, event)

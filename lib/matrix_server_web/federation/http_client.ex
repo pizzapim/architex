@@ -75,7 +75,8 @@ defmodule MatrixServerWeb.Federation.HTTPClient do
 
   def get_state_ids(client, room_id, event_id) do
     path =
-      RouteHelpers.event_path(Endpoint, :state_ids, room_id) |> Tesla.build_url(event_id: event_id)
+      RouteHelpers.event_path(Endpoint, :state_ids, room_id)
+      |> Tesla.build_url(event_id: event_id)
 
     Tesla.get(client, path)
   end

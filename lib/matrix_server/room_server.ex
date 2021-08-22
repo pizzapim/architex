@@ -1,4 +1,11 @@
 defmodule MatrixServer.RoomServer do
+  @moduledoc """
+  A GenServer to hold and manipulate the state of a Matrix room.
+
+  Each RoomServer corresponds to one Matrix room that the homeserver participates in.
+  The RoomServers are supervised by a DynamicSupervisor RoomServer.Supervisor.
+  """
+
   use GenServer
 
   import Ecto.Query
@@ -18,17 +25,16 @@ defmodule MatrixServer.RoomServer do
     GenServer.start_link(__MODULE__, opts, name: name)
   end
 
-  @spec get_room_server(Room.t()) :: {:error, :not_found} | DynamicSupervisor.on_start_child()
-  def get_room_server(%Room{id: room_id}), do: get_room_server(room_id)
+  @doc """
+  Get the PID of the RoomServer for a room.
 
-  # Get room server pid, or spin one up for the room.
-  # If the room does not exist, return an error.
+  If the given room has no running RoomServer yet, it is created.
+  If the given room does not exist, an error is returned.
+  """
   @spec get_room_server(String.t()) :: {:error, :not_found} | DynamicSupervisor.on_start_child()
   def get_room_server(room_id) do
+    # TODO: Might be wise to use a transaction here to prevent race conditions.
     case Repo.one(from r in Room, where: r.id == ^room_id) do
-      nil ->
-        {:error, :not_found}
-
       %Room{state: serialized_state_set} ->
         case Registry.lookup(@registry, room_id) do
           [{pid, _}] ->
@@ -43,9 +49,19 @@ defmodule MatrixServer.RoomServer do
 
             DynamicSupervisor.start_child(@supervisor, {__MODULE__, opts})
         end
+
+      nil ->
+        {:error, :not_found}
     end
   end
 
+  @doc """
+  Create a new Matrix room.
+
+  The new room is created with the given `account` as creator.
+  Events are inserted into the new room depending on the input `input` and according
+  to the [Matrix documentation](https://matrix.org/docs/spec/client_server/r0.6.1#post-matrix-client-r0-createroom).
+  """
   @spec create_room(
           pid(),
           MatrixServer.Account.t(),
@@ -55,16 +71,30 @@ defmodule MatrixServer.RoomServer do
     GenServer.call(pid, {:create_room, account, input})
   end
 
-  @spec server_in_room(pid(), String.t()) :: boolean()
-  def server_in_room(pid, domain) do
-    GenServer.call(pid, {:server_in_room, domain})
+  @doc """
+  Check whether the given server participates in a room.
+
+  Check whether any participant of the room has a server name matching
+  the given `domain`.
+  """
+  @spec server_in_room?(pid(), String.t()) :: boolean()
+  def server_in_room?(pid, domain) do
+    GenServer.call(pid, {:server_in_room?, domain})
   end
 
+  @doc """
+  Get the state of a room, before the given event was inserted.
+
+  Return a list of all state events and the auth chain.
+  """
   @spec get_state_at_event(pid(), Event.t()) :: {[Event.t()], [Event.t()]}
   def get_state_at_event(pid, event) do
     GenServer.call(pid, {:get_state_at_event, event})
   end
 
+  @doc """
+  Same as `get_state_at_event/2`, except returns the lists as event IDs.
+  """
   @spec get_state_ids_at_event(pid(), Event.t()) :: {[String.t()], [String.t()]}
   def get_state_ids_at_event(pid, event) do
     GenServer.call(pid, {:get_state_ids_at_event, event})
@@ -101,7 +131,7 @@ defmodule MatrixServer.RoomServer do
     end
   end
 
-  def handle_call({:server_in_room, domain}, _from, %{state_set: state_set} = state) do
+  def handle_call({:server_in_room?, domain}, _from, %{state_set: state_set} = state) do
     result =
       Enum.any?(state_set, fn
         {{"m.room.member", user_id}, %Event{content: %{"membership" => "join"}}} ->

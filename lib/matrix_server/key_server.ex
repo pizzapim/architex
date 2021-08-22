@@ -1,4 +1,10 @@
 defmodule MatrixServer.KeyServer do
+  @moduledoc """
+  A GenServer holding the homeserver's keys, and responsible for signing objects.
+
+  Currently, it only supports one key pair that cannot expire.
+  """
+
   use GenServer
 
   # TODO: only support one signing key for now.
@@ -10,11 +16,22 @@ defmodule MatrixServer.KeyServer do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
 
+  @doc """
+  Sign the given object using the homeserver's signing keys.
+
+  Return the signature and the key ID used.
+  On error, return `:error`.
+  """
   @spec sign_object(map()) :: {:ok, String.t(), String.t()} | :error
   def sign_object(object) do
     GenServer.call(__MODULE__, {:sign_object, object})
   end
 
+  @doc """
+  Get the homeserver's signing keys.
+
+  Return a list of tuples, each holding the key ID and the key itself.
+  """
   @spec get_own_signing_keys() :: list({String.t(), binary()})
   def get_own_signing_keys() do
     GenServer.call(__MODULE__, :get_own_signing_keys)
