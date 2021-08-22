@@ -60,8 +60,14 @@ defmodule MatrixServer.RoomServer do
     GenServer.call(pid, {:server_in_room, domain})
   end
 
+  @spec get_state_at_event(pid(), Event.t()) :: {[Event.t()], [Event.t()]}
   def get_state_at_event(pid, event) do
     GenServer.call(pid, {:get_state_at_event, event})
+  end
+
+  @spec get_state_ids_at_event(pid(), Event.t()) :: {[String.t()], [String.t()]}
+  def get_state_ids_at_event(pid, event) do
+    GenServer.call(pid, {:get_state_ids_at_event, event})
   end
 
   ### Implementation
@@ -124,6 +130,26 @@ defmodule MatrixServer.RoomServer do
       |> Map.values()
       |> StateResolution.full_auth_chain(room_events)
       |> Enum.map(&room_events[&1])
+
+    {:reply, {state_events, auth_chain}, state}
+  end
+
+  def handle_call({:get_state_ids_at_event, %Event{room_id: room_id} = event}, _from, state) do
+    room_events =
+      Event
+      |> where([e], e.room_id == ^room_id)
+      |> select([e], {e.event_id, e})
+      |> Repo.all()
+      |> Enum.into(%{})
+
+    state_set = StateResolution.resolve(event, false)
+    state_events = Enum.map(state_set, fn {_, %Event{event_id: event_id}} -> event_id end)
+
+    auth_chain =
+      state_set
+      |> Map.values()
+      |> StateResolution.full_auth_chain(room_events)
+      |> MapSet.to_list()
 
     {:reply, {state_events, auth_chain}, state}
   end

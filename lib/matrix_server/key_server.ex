@@ -48,8 +48,6 @@ defmodule MatrixServer.KeyServer do
     object = Map.drop(object, [:signatures, :unsigned])
 
     with {:ok, json} <- MatrixServer.encode_canonical_json(object) do
-      IO.puts(json)
-
       signature =
         json
         |> :enacl.sign_detached(private_key)

@@ -43,6 +43,22 @@ defmodule MatrixServerWeb.Federation.EventController do
         "event_id" => event_id,
         "room_id" => room_id
       }) do
+    get_state_or_state_ids(conn, :state, origin, event_id, room_id)
+  end
+
+  def state(conn, _), do: put_error(conn, :missing_param)
+
+  def state_ids(%Plug.Conn{assigns: %{origin: origin}} = conn, %{
+        "event_id" => event_id,
+        "room_id" => room_id
+      }) do
+    get_state_or_state_ids(conn, :state_ids, origin, event_id, room_id)
+  end
+
+  def state_ids(conn, _), do: put_error(conn, :missing_param)
+
+  @spec get_state_or_state_ids(Plug.Conn.t(), :state | :state_ids, String.t(), String.t(), String.t()) :: Plug.Conn.t()
+  defp get_state_or_state_ids(conn, state_or_state_ids, origin, event_id, room_id) do
     query =
       Event
       |> where([e], e.event_id == ^event_id and e.room_id == ^room_id)
@@ -53,7 +69,11 @@ defmodule MatrixServerWeb.Federation.EventController do
         case RoomServer.get_room_server(room) do
           {:ok, pid} ->
             if RoomServer.server_in_room(pid, origin) do
-              {state_events, auth_chain} = RoomServer.get_state_at_event(pid, event)
+              {state_events, auth_chain} =
+                case state_or_state_ids do
+                  :state -> RoomServer.get_state_at_event(pid, event)
+                  :state_ids -> RoomServer.get_state_ids_at_event(pid, event)
+                end
 
               data = %{
                 auth_chain: auth_chain,
@@ -75,6 +95,4 @@ defmodule MatrixServerWeb.Federation.EventController do
         put_error(conn, :not_found, "Event or room not found.")
     end
   end
-
-  def state(conn, _), do: put_error(conn, :missing_param)
 end

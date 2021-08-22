@@ -73,14 +73,19 @@ defmodule MatrixServerWeb.Federation.HTTPClient do
     Tesla.get(client, path)
   end
 
+  def get_state_ids(client, room_id, event_id) do
+    path =
+      RouteHelpers.event_path(Endpoint, :state_ids, room_id) |> Tesla.build_url(event_id: event_id)
+
+    Tesla.get(client, path)
+  end
+
   defp tesla_request(method, client, path, request_schema) do
     with {:ok, %Tesla.Env{body: body}} <- Tesla.request(client, url: path, method: method),
          %Ecto.Changeset{valid?: true} = cs <- apply(request_schema, :changeset, [body]) do
       {:ok, Ecto.Changeset.apply_changes(cs)}
     else
-      x ->
-        IO.inspect(x)
-        :error
+      _ -> :error
     end
   end
 end
