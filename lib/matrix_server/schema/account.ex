@@ -3,7 +3,7 @@ defmodule MatrixServer.Account do
 
   import Ecto.{Changeset, Query}
 
-  alias MatrixServer.{Repo, Account, Device}
+  alias MatrixServer.{Repo, Account, Device, Room, JoinedRoom}
   alias MatrixServerWeb.Client.Request.{Register, Login}
   alias Ecto.Multi
 
@@ -17,6 +17,11 @@ defmodule MatrixServer.Account do
   schema "accounts" do
     field :password_hash, :string, redact: true
     has_many :devices, Device, foreign_key: :localpart
+
+    many_to_many :joined_rooms, Room,
+      join_through: JoinedRoom,
+      join_keys: [localpart: :localpart, room_id: :id]
+
     timestamps(updated_at: false)
   end
 

@@ -51,6 +51,7 @@ defmodule MatrixServerWeb.Router do
       post "/logout", AccountController, :logout
       post "/logout/all", AccountController, :logout_all
       post "/createRoom", RoomController, :create
+      get "/joined_rooms", RoomController, :joined_rooms
 
       scope "/directory/room" do
         put "/:alias", AliasesController, :create

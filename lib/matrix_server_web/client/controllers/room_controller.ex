@@ -2,9 +2,9 @@ defmodule MatrixServerWeb.Client.RoomController do
   use MatrixServerWeb, :controller
 
   import MatrixServerWeb.Error
-  import Ecto.Changeset
+  import Ecto.{Changeset, Query}
 
-  alias MatrixServer.Room
+  alias MatrixServer.{Repo, Room}
   alias MatrixServerWeb.Client.Request.CreateRoom
   alias Ecto.Changeset
   alias Plug.Conn
@@ -30,5 +30,20 @@ defmodule MatrixServerWeb.Client.RoomController do
       _ ->
         put_error(conn, :bad_json)
     end
+  end
+
+  def joined_rooms(%Conn{assigns: %{account: account}} = conn, _params) do
+    joined_room_ids = account
+    |> Ecto.assoc(:joined_rooms)
+    |> select([jr], jr.id)
+    |> Repo.all()
+
+    data = %{
+      joined_rooms: joined_room_ids
+    }
+
+    conn
+    |> put_status(200)
+    |> json(data)
   end
 end

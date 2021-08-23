@@ -11,7 +11,7 @@ defmodule MatrixServer.RoomServer do
   import Ecto.Query
   import Ecto.Changeset
 
-  alias MatrixServer.{Repo, Room, Event, StateResolution}
+  alias MatrixServer.{Repo, Room, Event, StateResolution, JoinedRoom, Account}
   alias MatrixServer.StateResolution.Authorization
   alias MatrixServerWeb.Client.Request.CreateRoom
 
@@ -199,6 +199,7 @@ defmodule MatrixServer.RoomServer do
            join_creator <- Event.join(room, account, [create_room]),
            {:ok, state_set, join_creator, room} <-
              verify_and_insert_event(join_creator, state_set, room),
+           {:ok, _} <- insert_joined_room_assoc(account, room),
            pls <- Event.power_levels(room, account, [create_room, join_creator]),
            {:ok, state_set, pls, room} <- verify_and_insert_event(pls, state_set, room) do
         auth_events = [create_room, join_creator, pls]
@@ -234,6 +235,10 @@ defmodule MatrixServer.RoomServer do
         _ -> Repo.rollback(:event_creation)
       end
     end
+  end
+
+  defp insert_joined_room_assoc(%Account{localpart: localpart}, %Room{id: room_id}) do
+    Repo.insert(%JoinedRoom{localpart: localpart, room_id: room_id})
   end
 
   # TODO: trusted_private_chat:

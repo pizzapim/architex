@@ -1,4 +1,11 @@
 defmodule MatrixServer.StateResolution.Authorization do
+  @moduledoc """
+  Implementation of Matrix event authorization rules for stat resolution.
+
+  Note that some authorization rules are already checked in
+  `MatrixServer.Event.prevalidate/1` so they are skipped here.
+  """
+
   import MatrixServer.StateResolution
   import Ecto.Query
 

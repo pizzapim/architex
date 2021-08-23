@@ -1,4 +1,23 @@
 defmodule MatrixServer.StateResolution do
+  @moduledoc """
+  Functions for resolving the state of a Matrix room.
+
+  Currently, only state resolution from room version 2 is supported,
+  see [the Matrix docs](https://spec.matrix.org/unstable/rooms/v2/).
+
+  The current implementation of the state resolution algorithm performs
+  rather badly.
+  Each time state is resolved, all events in the room are fetched from
+  the database and loaded into memory.
+  This is mostly so I didn't have to worry about fetching events from the
+  database when developing this initial implementation.
+  Then, the state is calculated using the new event's previous events and auth
+  events.
+  To prevent loading all events into memory, and calculating the whole state each
+  time, we should make snapshots of the state of a room at regular intervals.
+  It looks like Dendrite does this too.
+  """
+
   import Ecto.Query
 
   alias MatrixServer.{Repo, Event, Room}
@@ -59,6 +78,13 @@ defmodule MatrixServer.StateResolution do
     events
     |> Enum.map(&auth_chain(&1, room_events))
     |> Enum.reduce(MapSet.new(), &MapSet.union/2)
+  end
+
+  def update_state_set(
+        %Event{type: event_type, state_key: state_key} = event,
+        state_set
+      ) do
+    Map.put(state_set, {event_type, state_key}, event)
   end
 
   defp do_resolve([], _), do: %{}
@@ -263,13 +289,6 @@ defmodule MatrixServer.StateResolution do
     Enum.reduce(events, state_set, fn event, acc ->
       if authorized?(event, acc, room_events), do: update_state_set(event, acc), else: acc
     end)
-  end
-
-  def update_state_set(
-        %Event{type: event_type, state_key: state_key} = event,
-        state_set
-      ) do
-    Map.put(state_set, {event_type, state_key}, event)
   end
 
   defp authorized?(%Event{auth_events: auth_event_ids} = event, state_set, room_events) do
