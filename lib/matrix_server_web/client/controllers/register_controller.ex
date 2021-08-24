@@ -10,6 +10,11 @@ defmodule MatrixServerWeb.Client.RegisterController do
 
   @register_type "m.login.dummy"
 
+  @doc """
+  Register for an account on this homeserver.
+
+  Action for POST /_matrix/client/r0/register.
+  """
   def register(conn, %{"auth" => %{"type" => @register_type}} = params) do
     case Register.changeset(params) do
       %Changeset{valid?: true} = cs ->

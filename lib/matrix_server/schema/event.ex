@@ -74,11 +74,7 @@ defmodule MatrixServer.Event do
   end
 
   @spec create_room(Room.t(), Account.t(), String.t()) :: t()
-  def create_room(
-        room,
-        %Account{localpart: localpart} = creator,
-        room_version
-      ) do
+  def create_room(room, %Account{localpart: localpart} = creator, room_version) do
     mxid = MatrixServer.get_mxid(localpart)
 
     %Event{
@@ -92,8 +88,8 @@ defmodule MatrixServer.Event do
     }
   end
 
-  @spec join(Room.t(), Account.t(), [t()]) :: t()
-  def join(room, %Account{localpart: localpart} = sender, auth_events) do
+  @spec join(Room.t(), Account.t()) :: t()
+  def join(room, %Account{localpart: localpart} = sender) do
     mxid = MatrixServer.get_mxid(localpart)
 
     %Event{
@@ -102,17 +98,12 @@ defmodule MatrixServer.Event do
         state_key: mxid,
         content: %{
           "membership" => "join"
-        },
-        auth_events: Enum.map(auth_events, & &1.event_id)
+        }
     }
   end
 
-  @spec power_levels(Room.t(), Account.t(), [t()]) :: t()
-  def power_levels(
-        room,
-        %Account{localpart: localpart} = sender,
-        auth_events
-      ) do
+  @spec power_levels(Room.t(), Account.t()) :: t()
+  def power_levels(room, %Account{localpart: localpart} = sender) do
     mxid = MatrixServer.get_mxid(localpart)
 
     %Event{
@@ -134,73 +125,79 @@ defmodule MatrixServer.Event do
           "notifications" => %{
             "room" => 50
           }
-        },
-        auth_events: Enum.map(auth_events, & &1.event_id)
+        }
     }
   end
 
-  @spec name(Room.t(), Account.t(), String.t(), [t()]) :: %Event{}
-  def name(room, sender, name, auth_events) do
+  @spec name(Room.t(), Account.t(), String.t()) :: %Event{}
+  def name(room, sender, name) do
     %Event{
       new(room, sender)
       | type: "m.room.name",
         state_key: "",
         content: %{
           "name" => name
-        },
-        auth_events: Enum.map(auth_events, & &1.event_id)
+        }
     }
   end
 
-  @spec topic(Room.t(), Account.t(), String.t(), [t()]) :: t()
-  def topic(room, sender, topic, auth_events) do
+  @spec topic(Room.t(), Account.t(), String.t()) :: t()
+  def topic(room, sender, topic) do
     %Event{
       new(room, sender)
       | type: "m.room.topic",
         state_key: "",
         content: %{
           "topic" => topic
-        },
-        auth_events: Enum.map(auth_events, & &1.event_id)
+        }
     }
   end
 
-  @spec join_rules(Room.t(), Account.t(), String.t(), [t()]) :: t()
-  def join_rules(room, sender, join_rule, auth_events) do
+  @spec join_rules(Room.t(), Account.t(), String.t()) :: t()
+  def join_rules(room, sender, join_rule) do
     %Event{
       new(room, sender)
       | type: "m.room.join_rules",
         state_key: "",
         content: %{
           "join_rule" => join_rule
-        },
-        auth_events: Enum.map(auth_events, & &1.event_id)
+        }
     }
   end
 
-  @spec history_visibility(Room.t(), Account.t(), String.t(), [t()]) :: t()
-  def history_visibility(room, sender, history_visibility, auth_events) do
+  @spec history_visibility(Room.t(), Account.t(), String.t()) :: t()
+  def history_visibility(room, sender, history_visibility) do
     %Event{
       new(room, sender)
       | type: "m.room.history_visibility",
         state_key: "",
         content: %{
           "history_visibility" => history_visibility
-        },
-        auth_events: Enum.map(auth_events, & &1.event_id)
+        }
     }
   end
 
-  @spec guest_access(Room.t(), Account.t(), String.t(), [t()]) :: t()
-  def guest_access(room, sender, guest_access, auth_events) do
+  @spec guest_access(Room.t(), Account.t(), String.t()) :: t()
+  def guest_access(room, sender, guest_access) do
     %Event{
       new(room, sender)
       | type: "m.room.guest_access",
         state_key: "",
         content: %{
           "guest_access" => guest_access
-        },
-        auth_events: Enum.map(auth_events, & &1.event_id)
+        }
+    }
+  end
+
+  @spec invite(Room.t(), Account.t(), String.t()) :: t()
+  def invite(room, sender, user_id) do
+    %Event{
+      new(room, sender)
+      | type: "m.room.member",
+        state_key: user_id,
+        content: %{
+          "membership" => "invite"
+        }
     }
   end
 

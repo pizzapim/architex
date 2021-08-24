@@ -5,6 +5,11 @@ defmodule MatrixServerWeb.Client.AliasesController do
 
   alias MatrixServer.Alias
 
+  @doc """
+  Create a new mapping from room alias to room ID.
+
+  Action for PUT /_matrix/client/r0/directory/room/{roomAlias}.
+  """
   def create(conn, %{"alias" => alias, "room_id" => room_id}) do
     case Alias.create(alias, room_id) do
       {:ok, _} ->

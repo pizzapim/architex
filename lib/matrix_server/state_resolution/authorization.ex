@@ -20,9 +20,12 @@ defmodule MatrixServer.StateResolution.Authorization do
     do: prev_events == []
 
   # Check rule: 5.2.1
-  def authorized?(%Event{type: "m.room.member", state_key: state_key}, %{
-        {"m.room.create", ""} => %Event{content: %{"creator" => creator}}
-      }),
+  def authorized?(
+        %Event{type: "m.room.member", state_key: state_key, prev_events: [create_id]},
+        %{
+          {"m.room.create", ""} => %Event{event_id: create_id, content: %{"creator" => creator}}
+        }
+      ),
       do: state_key == creator
 
   def authorized?(
@@ -308,6 +311,9 @@ defmodule MatrixServer.StateResolution.Authorization do
       |> where([e], e.event_id in ^auth_event_ids)
       |> Repo.all()
       |> Enum.reduce(%{}, &update_state_set/2)
+
+    IO.inspect(event)
+    IO.inspect(state_set)
 
     authorized?(event, state_set)
   end

@@ -31,6 +31,12 @@ defmodule MatrixServerWeb.Federation.QueryController do
     end
   end
 
+  @doc """
+  Performs a query to get profile information, such as a display name or avatar,
+  for a given user.
+
+  Action for GET /_matrix/federation/v1/query/profile.
+  """
   def profile(conn, params) do
     with {:ok, %ProfileRequest{user_id: %UserId{localpart: localpart, domain: domain}}} <-
            ProfileRequest.validate(params) do

@@ -10,6 +10,11 @@ defmodule MatrixServerWeb.Client.LoginController do
 
   @login_type "m.login.password"
 
+  @doc """
+  Gets the homeserver's supported login types to authenticate users.
+
+  Action for GET /_matrix/client/r0/login.
+  """
   def login_types(conn, _params) do
     data = %{flows: [%{type: @login_type}]}
 
@@ -18,6 +23,12 @@ defmodule MatrixServerWeb.Client.LoginController do
     |> json(data)
   end
 
+  @doc """
+  Authenticates the user, and issues an access token they can use to
+  authorize themself in subsequent requests.
+
+  Action for POST /_matrix/client/r0/login.
+  """
   def login(
         conn,
         %{"type" => @login_type, "identifier" => %{"type" => "m.id.user"}} = params

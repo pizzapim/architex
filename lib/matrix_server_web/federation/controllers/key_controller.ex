@@ -5,6 +5,11 @@ defmodule MatrixServerWeb.Federation.KeyController do
 
   alias MatrixServer.KeyServer
 
+  @doc """
+  Gets the homeserver's published signing keys.
+
+  Action for GET /_matrix/key/v2/server/{keyId}.
+  """
   def get_signing_keys(conn, _params) do
     keys =
       KeyServer.get_own_signing_keys()

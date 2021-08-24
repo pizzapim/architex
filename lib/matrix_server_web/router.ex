@@ -56,6 +56,10 @@ defmodule MatrixServerWeb.Router do
       scope "/directory/room" do
         put "/:alias", AliasesController, :create
       end
+
+      scope "/rooms/:room_id" do
+        post "/invite", RoomController, :invite
+      end
     end
   end
 

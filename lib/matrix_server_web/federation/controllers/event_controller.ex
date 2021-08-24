@@ -8,6 +8,11 @@ defmodule MatrixServerWeb.Federation.EventController do
   alias MatrixServer.{Repo, Event, RoomServer}
   alias MatrixServerWeb.Federation.Transaction
 
+  @doc """
+  Retrieves a single event.
+
+  Action for GET /_matrix/federation/v1/event/{eventId}.
+  """
   def event(%Plug.Conn{assigns: %{origin: origin}} = conn, %{"event_id" => event_id}) do
     query =
       Event
@@ -39,6 +44,11 @@ defmodule MatrixServerWeb.Federation.EventController do
 
   def event(conn, _), do: put_error(conn, :missing_param)
 
+  @doc """
+  Retrieves a snapshot of a room's state at a given event.
+
+  Action for GET /_matrix/federation/v1/state/{roomId}.
+  """
   def state(%Plug.Conn{assigns: %{origin: origin}} = conn, %{
         "event_id" => event_id,
         "room_id" => room_id
@@ -48,6 +58,11 @@ defmodule MatrixServerWeb.Federation.EventController do
 
   def state(conn, _), do: put_error(conn, :missing_param)
 
+  @doc """
+  Retrieves a snapshot of a room's state at a given event, in the form of event IDs.
+
+  Action for GET /_matrix/federation/v1/state_ids/{roomId}.
+  """
   def state_ids(%Plug.Conn{assigns: %{origin: origin}} = conn, %{
         "event_id" => event_id,
         "room_id" => room_id

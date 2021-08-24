@@ -5,6 +5,11 @@ defmodule MatrixServerWeb.Client.InfoController do
 
   @supported_versions ["r0.6.1"]
 
+  @doc """
+  Gets the versions of the specification supported by the server.
+
+  Action for GET /_matrix/client/versions.
+  """
   def versions(conn, _params) do
     data = %{versions: @supported_versions}
 
