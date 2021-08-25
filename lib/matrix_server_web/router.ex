@@ -59,6 +59,7 @@ defmodule MatrixServerWeb.Router do
 
       scope "/rooms/:room_id" do
         post "/invite", RoomController, :invite
+        post "/join", RoomController, :join
       end
     end
   end

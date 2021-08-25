@@ -312,9 +312,6 @@ defmodule MatrixServer.StateResolution.Authorization do
       |> Repo.all()
       |> Enum.reduce(%{}, &update_state_set/2)
 
-    IO.inspect(event)
-    IO.inspect(state_set)
-
     authorized?(event, state_set)
   end
 end

@@ -86,4 +86,30 @@ defmodule MatrixServerWeb.Client.RoomController do
   end
 
   def invite(conn, _), do: put_error(conn, :missing_param)
+
+  @doc """
+  This API starts a user participating in a particular room, if that user is allowed to participate in that room.
+
+  Action for POST /_matrix/client/r0/rooms/{roomId}/join.
+  TODO: third_party_signed
+  """
+  def join(%Conn{assigns: %{account: account}} = conn, %{"room_id" => room_id}) do
+    case RoomServer.get_room_server(room_id) do
+      {:ok, pid} ->
+        case RoomServer.join(pid, account) do
+          {:ok, room_id} ->
+            conn
+            |> put_status(200)
+            |> json(%{room_id: room_id})
+
+          {:error, _} ->
+            put_error(conn, :unknown)
+        end
+
+      {:error, :not_found} ->
+        put_error(conn, :not_found, "The given room was not found.")
+    end
+  end
+
+  def join(conn, _), do: put_error(conn, :missing_param)
 end
