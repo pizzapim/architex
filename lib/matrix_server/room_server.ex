@@ -200,6 +200,7 @@ defmodule MatrixServer.RoomServer do
     end
   end
 
+  # Get a function that inserts an invite event into a room.
   @spec invite_insert_event(Room.t(), t(), Account.t(), String.t()) ::
           (() -> {:ok, t()} | {:error, atom()})
   defp invite_insert_event(room, state_set, account, user_id) do
@@ -217,6 +218,7 @@ defmodule MatrixServer.RoomServer do
     end
   end
 
+  # Get a function that inserts all events for room creation.
   @spec create_room_insert_events(Room.t(), Account.t(), CreateRoom.t()) ::
           (() -> {:ok, t()} | {:error, atom()})
   defp create_room_insert_events(room, account, %CreateRoom{
@@ -258,6 +260,7 @@ defmodule MatrixServer.RoomServer do
     end
   end
 
+  # Update the given room in the database with the given state set.
   @spec update_room_state_set(Room.t(), t()) :: Room.t()
   defp update_room_state_set(room, state_set) do
     serialized_state_set =
@@ -268,8 +271,9 @@ defmodule MatrixServer.RoomServer do
     Repo.update!(change(room, state: serialized_state_set))
   end
 
+  # Get the events for room creation as dictated by the given preset.
   # TODO: trusted_private_chat:
-  # All invitees are given the same power level as the room creator.
+  #       All invitees are given the same power level as the room creator.
   @spec room_creation_preset(Account.t(), String.t() | nil, Room.t()) :: [Event.t()]
   defp room_creation_preset(account, nil, %Room{visibility: visibility} = room) do
     preset =
@@ -296,6 +300,13 @@ defmodule MatrixServer.RoomServer do
     ]
   end
 
+  # Finalize the event struct and insert it into the room's state using state resolution.
+  # The values that are automatically added are:
+  # - Auth events
+  # - Prev events
+  # - Content hash
+  # - Event ID
+  # - Signature
   @spec finalize_and_insert_event(Event.t(), t(), Room.t()) ::
           {:ok, t(), Room.t()} | {:error, atom()}
   defp finalize_and_insert_event(
@@ -309,11 +320,12 @@ defmodule MatrixServer.RoomServer do
       |> Map.put(:prev_events, forward_extremities)
 
     case Event.post_process(event) do
-      {:ok, event} -> verify_and_insert_event(event, state_set, room)
+      {:ok, event} -> authenticate_and_insert_event(event, state_set, room)
       _ -> {:error, :event_creation}
     end
   end
 
+  # Get the auth events for an events.
   @spec auth_events_for_event(Event.t(), t()) :: [{String.t(), String.t()}]
   defp auth_events_for_event(%Event{type: "m.room.create"}, _), do: []
 
@@ -331,6 +343,7 @@ defmodule MatrixServer.RoomServer do
     |> Enum.map(& &1.event_id)
   end
 
+  # Get the auth events specific to m.room.member events.
   @spec auth_events_for_member_event(Event.t()) :: [{String.t(), String.t()}]
   defp auth_events_for_member_event(
          %Event{
@@ -349,6 +362,7 @@ defmodule MatrixServer.RoomServer do
 
   defp auth_events_for_member_event(_), do: []
 
+  # Get the third party invite state pair for an event, if it exists.
   @spec third_party_invite_state_pair(Event.t()) :: {String.t(), String.t()} | nil
   defp third_party_invite_state_pair(%Event{
          content: %{
@@ -361,10 +375,13 @@ defmodule MatrixServer.RoomServer do
 
   defp third_party_invite_state_pair(_), do: nil
 
-  @spec verify_and_insert_event(Event.t(), t(), Room.t()) ::
+  # Authenticate and insert a new event using state resolution.
+  # Implements the checks as described in the
+  # [Matrix docs](https://matrix.org/docs/spec/server_server/latest#checks-performed-on-receipt-of-a-pdu).
+  @spec authenticate_and_insert_event(Event.t(), t(), Room.t()) ::
           {:ok, t(), Room.t()} | {:error, atom()}
-  defp verify_and_insert_event(event, current_state_set, room) do
-    # TODO: Correct error values.
+  defp authenticate_and_insert_event(event, current_state_set, room) do
+    # TODO: Correctly handle soft fails.
     # Check the following things:
     # 1. TODO: Is a valid event, otherwise it is dropped.
     # 2. TODO: Passes signature checks, otherwise it is dropped.
@@ -388,18 +405,22 @@ defmodule MatrixServer.RoomServer do
     end
   end
 
+  # Update local accounts' room membership if applicable.
   @spec update_joined_rooms(Event.t(), Room.t()) :: JoinedRoom.t() | nil
   defp update_joined_rooms(
          %Event{
            type: "m.room.member",
            sender: %UserId{localpart: localpart, domain: domain},
-           content: %{"membership" => "join"}
+           content: %{"membership" => membership}
          },
          %Room{id: room_id}
        ) do
-    # TODO: Also remove joined rooms.
     if domain == MatrixServer.server_name() do
-      Repo.insert(%JoinedRoom{localpart: localpart, room_id: room_id})
+      if membership == "join" do
+        Repo.insert(%JoinedRoom{localpart: localpart, room_id: room_id}, on_conflict: :nothing)
+      else
+        Repo.delete_all(from jr in JoinedRoom, where: jr.room_id == ^room_id and jr.localpart == ^localpart)
+      end
     end
   end
 
