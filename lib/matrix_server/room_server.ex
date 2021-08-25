@@ -14,7 +14,6 @@ defmodule MatrixServer.RoomServer do
   import Ecto.Changeset
 
   alias MatrixServer.{Repo, Room, Event, StateResolution, Account, JoinedRoom}
-  alias MatrixServer.Types.UserId
   alias MatrixServer.StateResolution.Authorization
   alias MatrixServerWeb.Client.Request.CreateRoom
 
@@ -208,7 +207,11 @@ defmodule MatrixServer.RoomServer do
     end
   end
 
-  def handle_call({:join, account}, _from, %{room: %Room{id: room_id} = room, state_set: state_set} = state) do
+  def handle_call(
+        {:join, account},
+        _from,
+        %{room: %Room{id: room_id} = room, state_set: state_set} = state
+      ) do
     case Repo.transaction(join_insert_event(room, state_set, account)) do
       {:ok, state_set} -> {:reply, {:ok, room_id}, %{state | state_set: state_set}}
       {:error, reason} -> {:reply, {:error, reason}, state}
@@ -216,7 +219,7 @@ defmodule MatrixServer.RoomServer do
   end
 
   # Get a function that inserts a join event into the room for the given account.
-  @spec join_insert_event(Room.t(), t(), Account.t()) :: (-> {:ok, t()} | {:error, atom()})
+  @spec join_insert_event(Room.t(), t(), Account.t()) :: (() -> {:ok, t()} | {:error, atom()})
   defp join_insert_event(room, state_set, account) do
     join_event = Event.join(room, account)
 
@@ -429,7 +432,7 @@ defmodule MatrixServer.RoomServer do
       room = Room.update_forward_extremities(event, room)
       event = Repo.insert!(event)
       state_set = StateResolution.resolve_forward_extremities(event)
-      _ = update_joined_rooms(event, room)
+      _ = update_joined_rooms(room, state_set)
 
       {:ok, state_set, room}
     else
@@ -438,23 +441,33 @@ defmodule MatrixServer.RoomServer do
   end
 
   # Update local accounts' room membership if applicable.
-  @spec update_joined_rooms(Event.t(), Room.t()) :: JoinedRoom.t() | nil
-  defp update_joined_rooms(
-         %Event{
-           type: "m.room.member",
-           sender: %UserId{localpart: localpart, domain: domain},
-           content: %{"membership" => membership}
-         },
-         %Room{id: room_id}
-       ) do
-    if domain == MatrixServer.server_name() do
-      if membership == "join" do
-        Repo.insert(%JoinedRoom{localpart: localpart, room_id: room_id}, on_conflict: :nothing)
-      else
-        Repo.delete_all(from jr in JoinedRoom, where: jr.room_id == ^room_id and jr.localpart == ^localpart)
-      end
-    end
-  end
+  # TODO: Could be a background job.
+  @spec update_joined_rooms(Room.t(), t()) :: JoinedRoom.t() | nil
+  defp update_joined_rooms(%Room{id: room_id}, state_set) do
+    server_name = MatrixServer.server_name()
 
-  defp update_joined_rooms(_, _), do: nil
+    {joined, not_joined} =
+      state_set
+      |> Enum.filter(fn {{type, state_key}, _} ->
+        type == "m.room.member" and MatrixServer.get_domain(state_key) == server_name
+      end)
+      |> Enum.split_with(fn {_, %Event{content: %{"membership" => membership}}} ->
+        membership == "join"
+      end)
+
+    joined_assocs =
+      Enum.map(joined, fn {{_, state_key}, _} ->
+        %{localpart: MatrixServer.get_localpart(state_key), room_id: room_id}
+      end)
+
+    not_joined_localparts =
+      Enum.map(not_joined, fn {{_, state_key}, _} -> MatrixServer.get_localpart(state_key) end)
+
+    _ = Repo.insert_all(JoinedRoom, joined_assocs, on_conflict: :nothing)
+
+    Repo.delete_all(
+      from jr in JoinedRoom,
+        where: jr.room_id == ^room_id and jr.localpart in ^not_joined_localparts
+    )
+  end
 end
