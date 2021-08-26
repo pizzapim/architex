@@ -61,6 +61,7 @@ defmodule MatrixServerWeb.Router do
         post "/invite", RoomController, :invite
         post "/join", RoomController, :join
         post "/leave", RoomController, :leave
+        post "/kick", RoomController, :kick
       end
     end
   end

@@ -213,6 +213,19 @@ defmodule MatrixServer.Event do
     }
   end
 
+  @spec kick(Room.t(), Account.t(), String.t(), String.t() | nil) :: t()
+  def kick(room, sender, user_id, reason \\ nil) do
+    content = %{"membership" => "leave"}
+    content = if reason, do: Map.put(content, "reason", reason), else: content
+
+    %Event{
+      new(room, sender)
+      | type: "m.room.member",
+        state_key: user_id,
+        content: content
+    }
+  end
+
   @spec is_control_event(t()) :: boolean()
   def is_control_event(%Event{type: "m.room.power_levels", state_key: ""}), do: true
   def is_control_event(%Event{type: "m.room.join_rules", state_key: ""}), do: true

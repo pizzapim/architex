@@ -6,7 +6,7 @@ defmodule MatrixServerWeb.Client.RoomController do
 
   alias MatrixServer.{Repo, Room, RoomServer}
   alias MatrixServer.Types.UserId
-  alias MatrixServerWeb.Client.Request.CreateRoom
+  alias MatrixServerWeb.Client.Request.{CreateRoom, Kick}
   alias Ecto.Changeset
   alias Plug.Conn
 
@@ -111,8 +111,6 @@ defmodule MatrixServerWeb.Client.RoomController do
     end
   end
 
-  def join(conn, _), do: put_error(conn, :missing_param)
-
   @doc """
   This API stops a user participating in a particular room.
 
@@ -136,5 +134,26 @@ defmodule MatrixServerWeb.Client.RoomController do
     end
   end
 
-  def leave(conn, _), do: put_error(conn, :missing_param)
+  @doc """
+  Kick a user from the room.
+
+  Action for POST /_matrix/client/r0/rooms/{roomId}/kick.
+  """
+  def kick(%Conn{assigns: %{account: account}} = conn, %{"room_id" => room_id} = params) do
+    with {:ok, request} <- Kick.parse(params),
+         {:ok, pid} <- RoomServer.get_room_server(room_id) do
+      case RoomServer.kick(pid, account, request) do
+        :ok ->
+          conn
+          |> send_resp(200, [])
+          |> halt()
+
+        {:error, _} ->
+          put_error(conn, :unknown)
+      end
+    else
+      {:error, %Ecto.Changeset{}} -> put_error(conn, :bad_json)
+      {:error, :not_found} -> put_error(conn, :not_found, "Room not found.")
+    end
+  end
 end

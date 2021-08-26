@@ -15,7 +15,7 @@ defmodule MatrixServer.RoomServer do
 
   alias MatrixServer.{Repo, Room, Event, StateResolution, Account, JoinedRoom}
   alias MatrixServer.StateResolution.Authorization
-  alias MatrixServerWeb.Client.Request.CreateRoom
+  alias MatrixServerWeb.Client.Request.{CreateRoom, Kick}
 
   @registry MatrixServer.RoomServer.Registry
   @supervisor MatrixServer.RoomServer.Supervisor
@@ -122,6 +122,14 @@ defmodule MatrixServer.RoomServer do
     GenServer.call(pid, {:leave, account})
   end
 
+  @doc """
+  Kick a user from this room.
+  """
+  @spec kick(pid(), Account.t(), Kick.t()) :: :ok | {:error, atom()}
+  def kick(pid, account, request) do
+    GenServer.call(pid, {:kick, account, request})
+  end
+
   ### Implementation
 
   @impl true
@@ -149,9 +157,14 @@ defmodule MatrixServer.RoomServer do
       ) do
     # TODO: power_level_content_override, initial_state, invite, invite_3pid
     case Repo.transaction(create_room_insert_events(room, account, input)) do
-      {:ok, state_set} -> {:reply, {:ok, room_id}, %{state | state_set: state_set}}
-      {:error, reason} -> {:reply, {:error, reason}, state}
-      _ -> {:reply, {:error, :unknown}, state}
+      {:ok, {state_set, room}} ->
+        {:reply, {:ok, room_id}, %{state | state_set: state_set, room: room}}
+
+      {:error, reason} ->
+        {:reply, {:error, reason}, state}
+
+      _ ->
+        {:reply, {:error, :unknown}, state}
     end
   end
 
@@ -212,7 +225,7 @@ defmodule MatrixServer.RoomServer do
     invite_event = Event.invite(room, account, user_id)
 
     case insert_single_event(room, state_set, invite_event) do
-      {:ok, state_set} -> {:reply, :ok, %{state | state_set: state_set}}
+      {:ok, {state_set, room}} -> {:reply, :ok, %{state | state_set: state_set, room: room}}
       {:error, reason} -> {:reply, {:error, reason}, state}
     end
   end
@@ -225,8 +238,11 @@ defmodule MatrixServer.RoomServer do
     join_event = Event.join(room, account)
 
     case insert_single_event(room, state_set, join_event) do
-      {:ok, state_set} -> {:reply, {:ok, room_id}, %{state | state_set: state_set}}
-      {:error, reason} -> {:reply, {:error, reason}, state}
+      {:ok, {state_set, room}} ->
+        {:reply, {:ok, room_id}, %{state | state_set: state_set, room: room}}
+
+      {:error, reason} ->
+        {:reply, {:error, reason}, state}
     end
   end
 
@@ -234,18 +250,31 @@ defmodule MatrixServer.RoomServer do
     leave_event = Event.leave(room, account)
 
     case insert_single_event(room, state_set, leave_event) do
-      {:ok, state_set} -> {:reply, :ok, %{state | state_set: state_set}}
+      {:ok, {state_set, room}} -> {:reply, :ok, %{state | state_set: state_set, room: room}}
       {:error, reason} -> {:reply, {:error, reason}, state}
     end
   end
 
-  @spec insert_single_event(Room.t(), t(), Event.t()) :: {:ok, t()} | {:error, atom()}
+  def handle_call(
+        {:kick, account, %Kick{user_id: user_id, reason: reason}},
+        _from,
+        %{room: room, state_set: state_set} = state
+      ) do
+    kick_event = Event.kick(room, account, user_id, reason)
+
+    case insert_single_event(room, state_set, kick_event) do
+      {:ok, {state_set, room}} -> {:reply, :ok, %{state | state_set: state_set, room: room}}
+      {:error, reason} -> {:reply, {:error, reason}, state}
+    end
+  end
+
+  @spec insert_single_event(Room.t(), t(), Event.t()) :: {:ok, t(), Room.t()} | {:error, atom()}
   defp insert_single_event(room, state_set, event) do
     Repo.transaction(fn ->
       case finalize_and_insert_event(event, state_set, room) do
         {:ok, state_set, room} ->
           _ = update_room_state_set(room, state_set)
-          state_set
+          {state_set, room}
 
         {:error, reason} ->
           Repo.rollback(reason)
@@ -255,7 +284,7 @@ defmodule MatrixServer.RoomServer do
 
   # Get a function that inserts all events for room creation.
   @spec create_room_insert_events(Room.t(), Account.t(), CreateRoom.t()) ::
-          (() -> {:ok, t()} | {:error, atom()})
+          (() -> {:ok, t(), Room.t()} | {:error, atom()})
   defp create_room_insert_events(room, account, %CreateRoom{
          room_version: room_version,
          preset: preset,
@@ -290,7 +319,7 @@ defmodule MatrixServer.RoomServer do
 
         {state_set, room} ->
           _ = update_room_state_set(room, state_set)
-          state_set
+          {state_set, room}
       end
     end
   end
@@ -298,6 +327,9 @@ defmodule MatrixServer.RoomServer do
   # Update the given room in the database with the given state set.
   @spec update_room_state_set(Room.t(), t()) :: Room.t()
   defp update_room_state_set(room, state_set) do
+    # TODO: We might as well hold state in the Room struct,
+    #       instead of the state_set state.
+    #       Create custom type for this.
     serialized_state_set =
       Enum.map(state_set, fn {{type, state_key}, event} ->
         [type, state_key, event.event_id]
