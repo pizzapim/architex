@@ -3,6 +3,13 @@ defmodule MatrixServerWeb.Client.Request.Login do
 
   import Ecto.Changeset
 
+  @type t :: %__MODULE__{
+          type: String.t(),
+          password: String.t(),
+          device_id: String.t(),
+          initial_device_display_name: String.t()
+        }
+
   @primary_key false
   embedded_schema do
     field :type, :string

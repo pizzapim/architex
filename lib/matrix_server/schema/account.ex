@@ -5,7 +5,7 @@ defmodule MatrixServer.Account do
 
   alias MatrixServer.{Repo, Account, Device, Room, JoinedRoom}
   alias MatrixServerWeb.Client.Request.{Register, Login}
-  alias Ecto.Multi
+  alias Ecto.{Multi, Changeset}
 
   @type t :: %__MODULE__{
           password_hash: String.t()
@@ -25,6 +25,10 @@ defmodule MatrixServer.Account do
     timestamps(updated_at: false)
   end
 
+  @doc """
+  Reports whether the given user localpart is available on this server.
+  """
+  @spec available?(String.t()) :: :ok | {:error, :user_in_use | :invalid_username}
   def available?(localpart) when is_binary(localpart) do
     if Regex.match?(MatrixServer.localpart_regex(), localpart) and
          String.length(localpart) <= localpart_length() do
@@ -42,6 +46,10 @@ defmodule MatrixServer.Account do
     end
   end
 
+  @doc """
+  Return an multi to register a new user.
+  """
+  @spec register(Register.t()) :: Multi.t()
   def register(%Register{} = input) do
     account_params = %{
       localpart: input.username || MatrixServer.random_string(10, ?a..?z),
@@ -62,6 +70,10 @@ defmodule MatrixServer.Account do
     |> Multi.run(:device_with_access_token, &Device.insert_new_access_token/2)
   end
 
+  @doc """
+  Return a function to log a user in.
+  """
+  @spec login(Login.t()) :: (Ecto.Repo.t() -> {:error, any()} | {:ok, Device.t()})
   def login(%Login{} = input) do
     localpart = try_get_localpart(input.identifier.user)
 
@@ -86,6 +98,10 @@ defmodule MatrixServer.Account do
     end
   end
 
+  @doc """
+  Get a device and its associated account using the device's access token.
+  """
+  @spec by_access_token(String.t()) :: {Account.t(), Device.t()} | nil
   def by_access_token(access_token) do
     Device
     |> where([d], d.access_token == ^access_token)
@@ -94,6 +110,7 @@ defmodule MatrixServer.Account do
     |> Repo.one()
   end
 
+  @spec changeset(map(), map()) :: Changeset.t()
   def changeset(account, params \\ %{}) do
     # TODO: fix password_hash in params
     account
@@ -105,11 +122,13 @@ defmodule MatrixServer.Account do
     |> unique_constraint(:localpart, name: :accounts_pkey)
   end
 
+  @spec localpart_length :: integer()
   defp localpart_length do
     # Subtract the "@" and ":" in the MXID.
     @max_mxid_length - 2 - String.length(MatrixServer.server_name())
   end
 
+  @spec try_get_localpart(String.t()) :: String.t()
   defp try_get_localpart("@" <> rest = user_id) do
     case String.split(rest, ":", parts: 2) do
       [localpart, _] -> localpart
@@ -118,4 +137,12 @@ defmodule MatrixServer.Account do
   end
 
   defp try_get_localpart(localpart), do: localpart
+
+  @doc """
+  Get the matrix user ID of an account.
+  """
+  @spec get_mxid(Account.t()) :: String.t()
+  def get_mxid(%Account{localpart: localpart}) do
+    "@" <> localpart <> ":" <> MatrixServer.server_name()
+  end
 end

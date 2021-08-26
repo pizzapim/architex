@@ -6,6 +6,13 @@ defmodule MatrixServer.Device do
   alias MatrixServer.{Account, Device, Repo}
   alias MatrixServerWeb.Client.Request.Login
 
+  @type t :: %__MODULE__{
+          device_id: String.t(),
+          access_token: String.t(),
+          display_name: String.t(),
+          localpart: String.t()
+        }
+
   @primary_key false
   schema "devices" do
     field :device_id, :string, primary_key: true

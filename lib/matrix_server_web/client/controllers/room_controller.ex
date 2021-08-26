@@ -112,4 +112,29 @@ defmodule MatrixServerWeb.Client.RoomController do
   end
 
   def join(conn, _), do: put_error(conn, :missing_param)
+
+  @doc """
+  This API stops a user participating in a particular room.
+
+  Action for POST /_matrix/client/r0/rooms/{roomId}/leave.
+  """
+  def leave(%Conn{assigns: %{account: account}} = conn, %{"room_id" => room_id}) do
+    case RoomServer.get_room_server(room_id) do
+      {:ok, pid} ->
+        case RoomServer.leave(pid, account) do
+          :ok ->
+            conn
+            |> send_resp(200, [])
+            |> halt()
+
+          {:error, _} ->
+            put_error(conn, :unknown)
+        end
+
+      {:error, :not_found} ->
+        put_error(conn, :not_found, "The given room was not found.")
+    end
+  end
+
+  def leave(conn, _), do: put_error(conn, :missing_param)
 end

@@ -5,6 +5,14 @@ defmodule MatrixServerWeb.Client.Request.Register do
 
   alias Ecto.Changeset
 
+  @type t :: %__MODULE__{
+          device_id: String.t(),
+          initial_device_display_name: String.t(),
+          password: String.t(),
+          username: String.t(),
+          inhibit_login: boolean()
+        }
+
   @primary_key false
   embedded_schema do
     field :device_id, :string

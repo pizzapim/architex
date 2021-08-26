@@ -81,42 +81,35 @@ defmodule MatrixServer.StateResolution.Authorization do
           type: "m.room.member",
           sender: sender,
           content: %{"membership" => "leave"},
-          state_key: sender
-        },
-        state_set
-      ) do
-    # Check rule: 5.4.1
-    get_membership(to_string(sender), state_set) in ["invite", "join"]
-  end
-
-  def authorized?(
-        %Event{
-          type: "m.room.member",
-          sender: sender,
-          content: %{"membership" => "leave"},
           state_key: state_key
         },
         state_set
       ) do
     sender_membership = get_membership(to_string(sender), state_set)
-    target_membership = get_membership(state_key, state_set)
-    power_levels = get_power_levels(state_set)
-    sender_pl = get_user_power_level(to_string(sender), power_levels)
-    target_pl = get_user_power_level(state_key, power_levels)
 
-    # Check rules: 5.4.2, 5.4.3, 5.4.4
-    cond do
-      sender_membership != "join" ->
-        false
+    if to_string(sender) == state_key do
+      # Check rule: 5.4.1
+      sender_membership in ["invite", "join"]
+    else
+      target_membership = get_membership(state_key, state_set)
+      power_levels = get_power_levels(state_set)
+      sender_pl = get_user_power_level(to_string(sender), power_levels)
+      target_pl = get_user_power_level(state_key, power_levels)
 
-      target_membership == "ban" and not has_power_level?(to_string(sender), power_levels, :ban) ->
-        false
+      # Check rules: 5.4.2, 5.4.3, 5.4.4
+      cond do
+        sender_membership != "join" ->
+          false
 
-      has_power_level?(to_string(sender), power_levels, :kick) and target_pl < sender_pl ->
-        true
+        target_membership == "ban" and not has_power_level?(to_string(sender), power_levels, :ban) ->
+          false
 
-      true ->
-        false
+        has_power_level?(to_string(sender), power_levels, :kick) and target_pl < sender_pl ->
+          true
+
+        true ->
+          false
+      end
     end
   end
 
@@ -312,6 +305,7 @@ defmodule MatrixServer.StateResolution.Authorization do
       |> Repo.all()
       |> Enum.reduce(%{}, &update_state_set/2)
 
+    IO.inspect(event)
     authorized?(event, state_set)
   end
 end

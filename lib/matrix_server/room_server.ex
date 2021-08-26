@@ -114,6 +114,14 @@ defmodule MatrixServer.RoomServer do
     GenServer.call(pid, {:join, account})
   end
 
+  @doc """
+  Leave a room.
+  """
+  @spec leave(pid(), Account.t()) :: :ok | {:error, atom()}
+  def leave(pid, account) do
+    GenServer.call(pid, {:leave, account})
+  end
+
   ### Implementation
 
   @impl true
@@ -215,6 +223,29 @@ defmodule MatrixServer.RoomServer do
     case Repo.transaction(join_insert_event(room, state_set, account)) do
       {:ok, state_set} -> {:reply, {:ok, room_id}, %{state | state_set: state_set}}
       {:error, reason} -> {:reply, {:error, reason}, state}
+    end
+  end
+
+  def handle_call({:leave, account}, _from, %{room: room, state_set: state_set} = state) do
+    case Repo.transaction(leave_insert_event(room, state_set, account)) do
+      {:ok, state_set} -> {:reply, :ok, %{state | state_set: state_set}}
+      {:error, reason} -> {:reply, {:error, reason}, state}
+    end
+  end
+
+  @spec leave_insert_event(Room.t(), t(), Account.t()) :: (() -> {:ok, t()} | {:error, atom()})
+  defp leave_insert_event(room, state_set, account) do
+    leave_event = Event.leave(room, account)
+
+    fn ->
+      case finalize_and_insert_event(leave_event, state_set, room) do
+        {:ok, state_set, room} ->
+          _ = update_room_state_set(room, state_set)
+          state_set
+
+        {:error, reason} ->
+          Repo.rollback(reason)
+      end
     end
   end
 

@@ -201,6 +201,18 @@ defmodule MatrixServer.Event do
     }
   end
 
+  @spec leave(Room.t(), Account.t()) :: t()
+  def leave(room, sender) do
+    %Event{
+      new(room, sender)
+      | type: "m.room.member",
+        state_key: Account.get_mxid(sender),
+        content: %{
+          "membership" => "leave"
+        }
+    }
+  end
+
   @spec is_control_event(t()) :: boolean()
   def is_control_event(%Event{type: "m.room.power_levels", state_key: ""}), do: true
   def is_control_event(%Event{type: "m.room.join_rules", state_key: ""}), do: true
