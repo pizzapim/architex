@@ -15,7 +15,7 @@ defmodule MatrixServer.RoomServer do
 
   alias MatrixServer.{Repo, Room, Event, StateResolution, Account, JoinedRoom}
   alias MatrixServer.StateResolution.Authorization
-  alias MatrixServerWeb.Client.Request.{CreateRoom, Kick}
+  alias MatrixServerWeb.Client.Request.{CreateRoom, Kick, Ban}
 
   @registry MatrixServer.RoomServer.Registry
   @supervisor MatrixServer.RoomServer.Supervisor
@@ -128,6 +128,22 @@ defmodule MatrixServer.RoomServer do
   @spec kick(pid(), Account.t(), Kick.t()) :: :ok | {:error, atom()}
   def kick(pid, account, request) do
     GenServer.call(pid, {:kick, account, request})
+  end
+
+  @doc """
+  Ban a user from this room.
+  """
+  @spec ban(pid(), Account.t(), Ban.t()) :: :ok | {:error, atom()}
+  def ban(pid, account, request) do
+    GenServer.call(pid, {:ban, account, request})
+  end
+
+  @doc """
+  Unban a user from this room.
+  """
+  @spec unban(pid(), Account.t(), String.t()) :: :ok | {:error, atom()}
+  def unban(pid, account, user_id) do
+    GenServer.call(pid, {:unban, account, user_id})
   end
 
   ### Implementation
@@ -268,7 +284,29 @@ defmodule MatrixServer.RoomServer do
     end
   end
 
-  @spec insert_single_event(Room.t(), t(), Event.t()) :: {:ok, t(), Room.t()} | {:error, atom()}
+  def handle_call(
+        {:ban, account, %Kick{user_id: user_id, reason: reason}},
+        _from,
+        %{room: room, state_set: state_set} = state
+      ) do
+    ban_event = Event.ban(room, account, user_id, reason)
+
+    case insert_single_event(room, state_set, ban_event) do
+      {:ok, {state_set, room}} -> {:reply, :ok, %{state | state_set: state_set, room: room}}
+      {:error, reason} -> {:reply, {:error, reason}, state}
+    end
+  end
+
+  def handle_call({:unban, account, user_id},_from,%{room: room, state_set: state_set} = state) do
+    unban_event = Event.unban(room, account, user_id)
+
+    case insert_single_event(room, state_set, unban_event) do
+      {:ok, {state_set, room}} -> {:reply, :ok, %{state | state_set: state_set, room: room}}
+      {:error, reason} -> {:reply, {:error, reason}, state}
+    end
+  end
+
+  @spec insert_single_event(Room.t(), t(), Event.t()) :: {:ok, {t(), Room.t()}} | {:error, atom()}
   defp insert_single_event(room, state_set, event) do
     Repo.transaction(fn ->
       case finalize_and_insert_event(event, state_set, room) do

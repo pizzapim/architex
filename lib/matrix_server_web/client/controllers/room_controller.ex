@@ -6,7 +6,7 @@ defmodule MatrixServerWeb.Client.RoomController do
 
   alias MatrixServer.{Repo, Room, RoomServer}
   alias MatrixServer.Types.UserId
-  alias MatrixServerWeb.Client.Request.{CreateRoom, Kick}
+  alias MatrixServerWeb.Client.Request.{CreateRoom, Kick, Ban}
   alias Ecto.Changeset
   alias Plug.Conn
 
@@ -156,4 +156,55 @@ defmodule MatrixServerWeb.Client.RoomController do
       {:error, :not_found} -> put_error(conn, :not_found, "Room not found.")
     end
   end
+
+  @doc """
+  Ban a user in the room.
+
+  Action for POST /_matrix/client/r0/rooms/{roomId}/ban.
+  """
+  def ban(%Conn{assigns: %{account: account}} = conn, %{"room_id" => room_id} = params) do
+    with {:ok, request} <- Ban.parse(params),
+         {:ok, pid} <- RoomServer.get_room_server(room_id) do
+      case RoomServer.ban(pid, account, request) do
+        :ok ->
+          conn
+          |> send_resp(200, [])
+          |> halt()
+
+        {:error, _} ->
+          put_error(conn, :unknown)
+      end
+    else
+      {:error, %Ecto.Changeset{}} -> put_error(conn, :bad_json)
+      {:error, :not_found} -> put_error(conn, :not_found, "Room not found.")
+    end
+  end
+
+  @doc """
+  Unban a user from the room.
+
+  Action for POST /_matrix/client/r0/rooms/{roomId}/unban.
+  """
+  def unban(%Conn{assigns: %{account: account}} = conn, %{
+        "room_id" => room_id,
+        "user_id" => user_id
+      }) do
+    case RoomServer.get_room_server(room_id) do
+      {:ok, pid} ->
+        case RoomServer.unban(pid, account, user_id) do
+          :ok ->
+            conn
+            |> send_resp(200, [])
+            |> halt()
+
+          {:error, _} ->
+            put_error(conn, :unknown)
+        end
+
+      {:error, :not_found} ->
+        put_error(conn, :not_found, "The given room was not found.")
+    end
+  end
+
+  def unban(conn, _), do: put_error(conn, :missing_param)
 end

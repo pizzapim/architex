@@ -62,6 +62,8 @@ defmodule MatrixServerWeb.Router do
         post "/join", RoomController, :join
         post "/leave", RoomController, :leave
         post "/kick", RoomController, :kick
+        post "/ban", RoomController, :ban
+        post "/unban", RoomController, :unban
       end
     end
   end
