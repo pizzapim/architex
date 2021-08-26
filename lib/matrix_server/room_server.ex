@@ -209,7 +209,9 @@ defmodule MatrixServer.RoomServer do
   end
 
   def handle_call({:invite, account, user_id}, _from, %{room: room, state_set: state_set} = state) do
-    case Repo.transaction(invite_insert_event(room, state_set, account, user_id)) do
+    invite_event = Event.invite(room, account, user_id)
+
+    case insert_single_event(room, state_set, invite_event) do
       {:ok, state_set} -> {:reply, :ok, %{state | state_set: state_set}}
       {:error, reason} -> {:reply, {:error, reason}, state}
     end
@@ -220,25 +222,27 @@ defmodule MatrixServer.RoomServer do
         _from,
         %{room: %Room{id: room_id} = room, state_set: state_set} = state
       ) do
-    case Repo.transaction(join_insert_event(room, state_set, account)) do
+    join_event = Event.join(room, account)
+
+    case insert_single_event(room, state_set, join_event) do
       {:ok, state_set} -> {:reply, {:ok, room_id}, %{state | state_set: state_set}}
       {:error, reason} -> {:reply, {:error, reason}, state}
     end
   end
 
   def handle_call({:leave, account}, _from, %{room: room, state_set: state_set} = state) do
-    case Repo.transaction(leave_insert_event(room, state_set, account)) do
+    leave_event = Event.leave(room, account)
+
+    case insert_single_event(room, state_set, leave_event) do
       {:ok, state_set} -> {:reply, :ok, %{state | state_set: state_set}}
       {:error, reason} -> {:reply, {:error, reason}, state}
     end
   end
 
-  @spec leave_insert_event(Room.t(), t(), Account.t()) :: (() -> {:ok, t()} | {:error, atom()})
-  defp leave_insert_event(room, state_set, account) do
-    leave_event = Event.leave(room, account)
-
-    fn ->
-      case finalize_and_insert_event(leave_event, state_set, room) do
+  @spec insert_single_event(Room.t(), t(), Event.t()) :: {:ok, t()} | {:error, atom()}
+  defp insert_single_event(room, state_set, event) do
+    Repo.transaction(fn ->
+      case finalize_and_insert_event(event, state_set, room) do
         {:ok, state_set, room} ->
           _ = update_room_state_set(room, state_set)
           state_set
@@ -246,42 +250,7 @@ defmodule MatrixServer.RoomServer do
         {:error, reason} ->
           Repo.rollback(reason)
       end
-    end
-  end
-
-  # Get a function that inserts a join event into the room for the given account.
-  @spec join_insert_event(Room.t(), t(), Account.t()) :: (() -> {:ok, t()} | {:error, atom()})
-  defp join_insert_event(room, state_set, account) do
-    join_event = Event.join(room, account)
-
-    fn ->
-      case finalize_and_insert_event(join_event, state_set, room) do
-        {:ok, state_set, room} ->
-          _ = update_room_state_set(room, state_set)
-          state_set
-
-        {:error, reason} ->
-          Repo.rollback(reason)
-      end
-    end
-  end
-
-  # Get a function that inserts an invite event into a room.
-  @spec invite_insert_event(Room.t(), t(), Account.t(), String.t()) ::
-          (() -> {:ok, t()} | {:error, atom()})
-  defp invite_insert_event(room, state_set, account, user_id) do
-    invite_event = Event.invite(room, account, user_id)
-
-    fn ->
-      case finalize_and_insert_event(invite_event, state_set, room) do
-        {:ok, state_set, room} ->
-          _ = update_room_state_set(room, state_set)
-          state_set
-
-        {:error, reason} ->
-          Repo.rollback(reason)
-      end
-    end
+    end)
   end
 
   # Get a function that inserts all events for room creation.
