@@ -28,12 +28,12 @@ TODO: list implemented endpoints
 ### Implemented
 
 * State resolution: functional, but very memory-intensive and with high database usage. For now it is sufficient, but snapshots should be used in the future. See: [State Resolution v2 for the Hopelessly Unmathematical](https://matrix.org/docs/guides/implementing-stateres), [State Resolution: Reloaded](https://matrix.uhoreg.ca/stateres/reloaded.html) and [Room Version 2](https://spec.matrix.org/unstable/rooms/v2).
-* Authorization rules [Room version 1](https://spec.matrix.org/unstable/rooms/v1/)
-* Homeserver authentication using signing keys [4.1 Request Authentication](https://matrix.org/docs/spec/server_server/latest#request-authentication).
-* Client authentication [5.1 Using access tokens](https://matrix.org/docs/spec/client_server/r0.6.1#using-access-tokens).
+* Authorization rules ([Room version 1](https://spec.matrix.org/unstable/rooms/v1/))
+* Homeserver authentication using signing keys ([4.1 Request Authentication](https://matrix.org/docs/spec/server_server/latest#request-authentication))
+* Client authentication ([5.1 Using access tokens](https://matrix.org/docs/spec/client_server/r0.6.1#using-access-tokens))
 
-### Major nimplemented features
+### Major unimplemented features
 
-* Resolving server names (but works for local development) [3.1 Resolving server names](https://matrix.org/docs/spec/server_server/latest#resolving-server-names)
-* Checks when receiving events via federation (i.e. valid format, signature check and hash check) [6.1 Checks performed on receipt of a PDU](https://matrix.org/docs/spec/server_server/latest#checks-performed-on-receipt-of-a-pdu)
+* Resolving server names (but works for local development) ([3.1 Resolving server names](https://matrix.org/docs/spec/server_server/latest#resolving-server-names))
+* Checks when receiving events via federation (i.e. valid format, signature check and hash check) ([6.1 Checks performed on receipt of a PDU](https://matrix.org/docs/spec/server_server/latest#checks-performed-on-receipt-of-a-pdu))
 * Federation of events
