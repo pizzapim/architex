@@ -30,6 +30,7 @@ defmodule MatrixServerWeb.Router do
       get "/register/available", AccountController, :available
       get "/login", LoginController, :login_types
       post "/login", LoginController, :login
+      get "/directory/list/room/:room_id", RoomDirectoryController, :get_visibility
     end
 
     get "/versions", InfoController, :versions
@@ -53,8 +54,9 @@ defmodule MatrixServerWeb.Router do
       post "/createRoom", RoomController, :create
       get "/joined_rooms", RoomController, :joined_rooms
 
-      scope "/directory/room" do
-        put "/:alias", AliasesController, :create
+      scope "/directory" do
+        put "/room/:alias", AliasesController, :create
+        put "/list/room/:room_id", RoomDirectoryController, :set_visibility
       end
 
       scope "/rooms/:room_id" do

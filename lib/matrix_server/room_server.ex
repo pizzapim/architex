@@ -146,6 +146,14 @@ defmodule MatrixServer.RoomServer do
     GenServer.call(pid, {:unban, account, user_id})
   end
 
+  @doc """
+  Attempt to set the room's visibility.
+  """
+  @spec set_visibility(pid(), Account.t(), atom()) :: :ok | {:error, atom()}
+  def set_visibility(pid, account, visibility) do
+    GenServer.call(pid, {:set_visibility, account, visibility})
+  end
+
   ### Implementation
 
   @impl true
@@ -297,12 +305,32 @@ defmodule MatrixServer.RoomServer do
     end
   end
 
-  def handle_call({:unban, account, user_id},_from,%{room: room, state_set: state_set} = state) do
+  def handle_call({:unban, account, user_id}, _from, %{room: room, state_set: state_set} = state) do
     unban_event = Event.unban(room, account, user_id)
 
     case insert_single_event(room, state_set, unban_event) do
       {:ok, {state_set, room}} -> {:reply, :ok, %{state | state_set: state_set, room: room}}
       {:error, reason} -> {:reply, {:error, reason}, state}
+    end
+  end
+
+  def handle_call(
+        {:set_visibility, account, visibility},
+        _from,
+        %{room: room, state_set: state_set} = state
+      ) do
+    case state_set do
+      %{{"m.room.create", ""} => %Event{content: %{"creator" => creator}}} ->
+        if creator == Account.get_mxid(account) do
+          room = Repo.update!(change(room, visibility: visibility))
+
+          {:reply, :ok, %{state | room: room}}
+        else
+          {:reply, {:error, :unauthorized}, state}
+        end
+
+      _ ->
+        {:reply, {:error, :unknown}, state}
     end
   end
 
