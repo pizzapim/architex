@@ -50,7 +50,12 @@ defmodule MatrixServer.Account do
   Return an multi to register a new user.
   """
   @spec register(Register.t()) :: Multi.t()
-  def register(%Register{username: username, device_id: device_id, initial_device_display_name: initial_device_display_name, password: password}) do
+  def register(%Register{
+        username: username,
+        device_id: device_id,
+        initial_device_display_name: initial_device_display_name,
+        password: password
+      }) do
     localpart = username || MatrixServer.random_string(10, ?a..?z)
 
     account_params = %{
