@@ -1,6 +1,4 @@
-alias MatrixServer.{Repo, Room, Event, Account, Device}
-
-timestamp = fn n -> DateTime.from_unix!(n, :microsecond) end
+alias MatrixServer.{Repo, Account, Device}
 
 Repo.insert!(%Account{
   localpart: "chuck",
