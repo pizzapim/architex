@@ -246,7 +246,7 @@ defmodule MatrixServer.RoomServer do
   end
 
   def handle_call({:invite, account, user_id}, _from, %{room: room, state_set: state_set} = state) do
-    invite_event = Event.invite(room, account, user_id)
+    invite_event = Event.Invite.new(room, account, user_id)
 
     case insert_single_event(room, state_set, invite_event) do
       {:ok, {state_set, room}} -> {:reply, :ok, %{state | state_set: state_set, room: room}}
@@ -259,7 +259,7 @@ defmodule MatrixServer.RoomServer do
         _from,
         %{room: %Room{id: room_id} = room, state_set: state_set} = state
       ) do
-    join_event = Event.join(room, account)
+    join_event = Event.Join.new(room, account)
 
     case insert_single_event(room, state_set, join_event) do
       {:ok, {state_set, room}} ->
@@ -271,7 +271,7 @@ defmodule MatrixServer.RoomServer do
   end
 
   def handle_call({:leave, account}, _from, %{room: room, state_set: state_set} = state) do
-    leave_event = Event.leave(room, account)
+    leave_event = Event.Leave.new(room, account)
 
     case insert_single_event(room, state_set, leave_event) do
       {:ok, {state_set, room}} -> {:reply, :ok, %{state | state_set: state_set, room: room}}
@@ -284,7 +284,7 @@ defmodule MatrixServer.RoomServer do
         _from,
         %{room: room, state_set: state_set} = state
       ) do
-    kick_event = Event.kick(room, account, user_id, reason)
+    kick_event = Event.Kick.new(room, account, user_id, reason)
 
     case insert_single_event(room, state_set, kick_event) do
       {:ok, {state_set, room}} -> {:reply, :ok, %{state | state_set: state_set, room: room}}
@@ -297,7 +297,7 @@ defmodule MatrixServer.RoomServer do
         _from,
         %{room: room, state_set: state_set} = state
       ) do
-    ban_event = Event.ban(room, account, user_id, reason)
+    ban_event = Event.Ban.new(room, account, user_id, reason)
 
     case insert_single_event(room, state_set, ban_event) do
       {:ok, {state_set, room}} -> {:reply, :ok, %{state | state_set: state_set, room: room}}
@@ -306,7 +306,7 @@ defmodule MatrixServer.RoomServer do
   end
 
   def handle_call({:unban, account, user_id}, _from, %{room: room, state_set: state_set} = state) do
-    unban_event = Event.unban(room, account, user_id)
+    unban_event = Event.Unban.new(room, account, user_id)
 
     case insert_single_event(room, state_set, unban_event) do
       {:ok, {state_set, room}} -> {:reply, :ok, %{state | state_set: state_set, room: room}}
@@ -359,14 +359,14 @@ defmodule MatrixServer.RoomServer do
        }) do
     events =
       ([
-         Event.create_room(room, account, room_version),
-         Event.join(room, account),
-         Event.power_levels(room, account)
+         Event.CreateRoom.new(room, account, room_version),
+         Event.Join.new(room, account),
+         Event.PowerLevels.new(room, account)
        ] ++
          room_creation_preset(account, preset, room) ++
          [
-           if(name, do: Event.name(room, account, name)),
-           if(topic, do: Event.topic(room, account, topic))
+           if(name, do: Event.Name.new(room, account, name)),
+           if(topic, do: Event.Topic.new(room, account, topic))
          ])
       |> Enum.reject(&Kernel.is_nil/1)
 
@@ -427,9 +427,9 @@ defmodule MatrixServer.RoomServer do
       end
 
     [
-      Event.join_rules(room, account, join_rule),
-      Event.history_visibility(room, account, his_vis),
-      Event.guest_access(room, account, guest_access)
+      Event.JoinRules.new(room, account, join_rule),
+      Event.HistoryVisibility.new(room, account, his_vis),
+      Event.GuestAccess.new(room, account, guest_access)
     ]
   end
 
