@@ -26,8 +26,8 @@ defmodule MatrixServer.Room do
     cast(room, params, [:visibility])
   end
 
-  def create_changeset(%CreateRoom{} = input) do
-    visibility = input.visibility || :public
+  def create_changeset(%CreateRoom{visibility: visibility}) do
+    visibility = visibility || :public
 
     %Room{id: generate_room_id()}
     |> changeset(%{visibility: visibility})

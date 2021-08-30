@@ -18,7 +18,7 @@ defmodule MatrixServerWeb.Client.RegisterController do
   def register(conn, %{"auth" => %{"type" => @register_type}} = params) do
     case Register.changeset(params) do
       %Changeset{valid?: true} = cs ->
-        input = apply_changes(cs)
+        %Register{inhibit_login: inhibit_login} = input = apply_changes(cs)
 
         case Account.register(input) |> Repo.transaction() do
           {:ok,
@@ -29,7 +29,7 @@ defmodule MatrixServerWeb.Client.RegisterController do
             data = %{user_id: MatrixServer.get_mxid(localpart)}
 
             data =
-              if not input.inhibit_login do
+              if not inhibit_login do
                 data
                 |> Map.put(:device_id, device_id)
                 |> Map.put(:access_token, access_token)

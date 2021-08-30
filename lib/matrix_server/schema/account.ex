@@ -50,22 +50,22 @@ defmodule MatrixServer.Account do
   Return an multi to register a new user.
   """
   @spec register(Register.t()) :: Multi.t()
-  def register(input) do
-    localpart = input.username || MatrixServer.random_string(10, ?a..?z)
+  def register(%Register{username: username, device_id: device_id, initial_device_display_name: initial_device_display_name, password: password}) do
+    localpart = username || MatrixServer.random_string(10, ?a..?z)
 
     account_params = %{
       localpart: localpart,
-      password_hash: Bcrypt.hash_pwd_salt(input.password)
+      password_hash: Bcrypt.hash_pwd_salt(password)
     }
 
     Multi.new()
     |> Multi.insert(:account, changeset(%Account{}, account_params))
     |> Multi.insert(:device, fn %{account: account} ->
-      device_id = input.device_id || Device.generate_device_id(account.localpart)
+      device_id = device_id || Device.generate_device_id(account.localpart)
       access_token = Device.generate_access_token(localpart, device_id)
 
       device_params = %{
-        display_name: input.initial_device_display_name,
+        display_name: initial_device_display_name,
         device_id: device_id
       }
 
@@ -78,13 +78,13 @@ defmodule MatrixServer.Account do
   Return a function to log a user in.
   """
   @spec login(Login.t()) :: (Ecto.Repo.t() -> {:error, any()} | {:ok, {Account.t(), Device.t()}})
-  def login(input) do
-    localpart = try_get_localpart(input.identifier.user)
+  def login(%Login{password: password, identifier: %Login.Identifier{user: user}} = input) do
+    localpart = try_get_localpart(user)
 
     fn repo ->
       case repo.one(from a in Account, where: a.localpart == ^localpart) do
         %Account{password_hash: hash} = account ->
-          if Bcrypt.verify_pass(input.password, hash) do
+          if Bcrypt.verify_pass(password, hash) do
             case Device.login(input, account) do
               {:ok, device} ->
                 {account, device}

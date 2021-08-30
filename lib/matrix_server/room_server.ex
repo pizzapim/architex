@@ -397,8 +397,8 @@ defmodule MatrixServer.RoomServer do
     #       instead of the state_set state.
     #       Create custom type for this.
     serialized_state_set =
-      Enum.map(state_set, fn {{type, state_key}, event} ->
-        [type, state_key, event.event_id]
+      Enum.map(state_set, fn {{type, state_key}, %Event{event_id: event_id}} ->
+        [type, state_key, event_id]
       end)
 
     Repo.update!(change(room, state: serialized_state_set))
@@ -473,7 +473,7 @@ defmodule MatrixServer.RoomServer do
     state_set
     |> Map.take(state_pairs)
     |> Map.values()
-    |> Enum.map(& &1.event_id)
+    |> Enum.map(fn %Event{event_id: event_id} -> event_id end)
   end
 
   # Get the auth events specific to m.room.member events.
