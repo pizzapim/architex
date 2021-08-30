@@ -13,14 +13,14 @@ defmodule MatrixServer.Account do
 
   @max_mxid_length 255
 
-  @primary_key {:localpart, :string, []}
   schema "accounts" do
+    field :localpart, :string
     field :password_hash, :string, redact: true
-    has_many :devices, Device, foreign_key: :localpart
+    has_many :devices, Device
 
     many_to_many :joined_rooms, Room,
       join_through: JoinedRoom,
-      join_keys: [localpart: :localpart, room_id: :id]
+      join_keys: [account_id: :id, room_id: :id]
 
     timestamps(updated_at: false)
   end
@@ -50,31 +50,35 @@ defmodule MatrixServer.Account do
   Return an multi to register a new user.
   """
   @spec register(Register.t()) :: Multi.t()
-  def register(%Register{} = input) do
+  def register(input) do
+    localpart = input.username || MatrixServer.random_string(10, ?a..?z)
+
     account_params = %{
-      localpart: input.username || MatrixServer.random_string(10, ?a..?z),
+      localpart: localpart,
       password_hash: Bcrypt.hash_pwd_salt(input.password)
     }
 
     Multi.new()
     |> Multi.insert(:account, changeset(%Account{}, account_params))
     |> Multi.insert(:device, fn %{account: account} ->
+      device_id = input.device_id || Device.generate_device_id(account.localpart)
+      access_token = Device.generate_access_token(localpart, device_id)
+
       device_params = %{
         display_name: input.initial_device_display_name,
-        device_id: input.device_id || Device.generate_device_id(account.localpart)
+        device_id: device_id
       }
 
-      Ecto.build_assoc(account, :devices)
+      Ecto.build_assoc(account, :devices, access_token: access_token)
       |> Device.changeset(device_params)
     end)
-    |> Multi.run(:device_with_access_token, &Device.insert_new_access_token/2)
   end
 
   @doc """
   Return a function to log a user in.
   """
-  @spec login(Login.t()) :: (Ecto.Repo.t() -> {:error, any()} | {:ok, Device.t()})
-  def login(%Login{} = input) do
+  @spec login(Login.t()) :: (Ecto.Repo.t() -> {:error, any()} | {:ok, {Account.t(), Device.t()}})
+  def login(input) do
     localpart = try_get_localpart(input.identifier.user)
 
     fn repo ->
@@ -83,7 +87,7 @@ defmodule MatrixServer.Account do
           if Bcrypt.verify_pass(input.password, hash) do
             case Device.login(input, account) do
               {:ok, device} ->
-                device
+                {account, device}
 
               {:error, _cs} ->
                 repo.rollback(:forbidden)
@@ -119,7 +123,7 @@ defmodule MatrixServer.Account do
     |> validate_length(:password_hash, max: 60)
     |> validate_format(:localpart, MatrixServer.localpart_regex())
     |> validate_length(:localpart, max: localpart_length())
-    |> unique_constraint(:localpart, name: :accounts_pkey)
+    |> unique_constraint(:localpart, name: :accounts_localpart_index)
   end
 
   @spec localpart_length :: integer()

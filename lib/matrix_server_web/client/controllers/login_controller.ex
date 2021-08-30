@@ -4,7 +4,7 @@ defmodule MatrixServerWeb.Client.LoginController do
   import MatrixServerWeb.Error
   import Ecto.Changeset
 
-  alias MatrixServer.{Repo, Account}
+  alias MatrixServer.{Repo, Account, Device}
   alias MatrixServerWeb.Client.Request.Login
   alias Ecto.Changeset
 
@@ -38,11 +38,13 @@ defmodule MatrixServerWeb.Client.LoginController do
         input = apply_changes(cs)
 
         case Account.login(input) |> Repo.transaction() do
-          {:ok, device} ->
+          {:ok,
+           {%Account{localpart: localpart},
+            %Device{access_token: access_token, device_id: device_id}}} ->
             data = %{
-              user_id: MatrixServer.get_mxid(device.localpart),
-              access_token: device.access_token,
-              device_id: device.device_id
+              user_id: MatrixServer.get_mxid(localpart),
+              access_token: access_token,
+              device_id: device_id
             }
 
             conn

@@ -2,11 +2,13 @@ defmodule MatrixServer.Repo.Migrations.CreateInitialTables do
   use Ecto.Migration
 
   def change do
-    create table(:accounts, primary_key: false) do
-      add :localpart, :string, primary_key: true, null: false
+    create table(:accounts) do
+      add :localpart, :string, null: false
       add :password_hash, :string, size: 60, null: false
       timestamps(updated_at: false)
     end
+
+    create index(:accounts, [:localpart], unique: true)
 
     create table(:rooms, primary_key: false) do
       add :state, {:array, {:array, :string}}, default: [], null: false
@@ -16,10 +18,7 @@ defmodule MatrixServer.Repo.Migrations.CreateInitialTables do
     end
 
     create table(:joined_rooms, primary_key: false) do
-      add :localpart,
-          references(:accounts, column: :localpart, type: :string),
-          primary_key: true,
-          null: false
+      add :account_id, references(:accounts), primary_key: true, null: false
 
       add :room_id, references(:rooms, type: :string),
         primary_key: true,
@@ -62,20 +61,16 @@ defmodule MatrixServer.Repo.Migrations.CreateInitialTables do
 
     create index(:aliases, [:room_id])
 
-    create table(:devices, primary_key: false) do
-      add :device_id, :string, primary_key: true, null: false
+    create table(:devices) do
+      add :device_id, :string, null: false
       add :access_token, :string
       add :display_name, :string
 
-      add :localpart,
-          references(:accounts, column: :localpart, on_delete: :delete_all, type: :string),
-          primary_key: true,
-          null: false
+      add :account_id, references(:accounts, on_delete: :delete_all), null: false
     end
 
-    # Compound primary already indexes device_id.
-    create index(:devices, [:localpart])
-
+    create index(:devices, [:device_id, :account_id], unique: true)
+    create index(:devices, [:account_id])
     create index(:devices, [:access_token], unique: true)
   end
 end

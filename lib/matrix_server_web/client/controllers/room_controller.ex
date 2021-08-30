@@ -207,4 +207,14 @@ defmodule MatrixServerWeb.Client.RoomController do
   end
 
   def unban(conn, _), do: put_error(conn, :missing_param)
+
+  def send_message(%Conn{assigns: %{account: account}, body_params: body_params} = conn, %{
+        "room_id" => room_id,
+        "event_type" => event_type,
+        "txn_id" => txn_id
+      }) do
+    conn
+    |> send_resp(200, [])
+    |> halt()
+  end
 end

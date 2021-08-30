@@ -4,43 +4,27 @@ defmodule MatrixServer.Device do
   import Ecto.{Changeset, Query}
 
   alias MatrixServer.{Account, Device, Repo}
-  alias MatrixServerWeb.Client.Request.Login
 
   @type t :: %__MODULE__{
           device_id: String.t(),
           access_token: String.t(),
           display_name: String.t(),
-          localpart: String.t()
+          account_id: integer()
         }
 
-  @primary_key false
   schema "devices" do
-    field :device_id, :string, primary_key: true
+    field :device_id, :string
     field :access_token, :string, redact: true
     field :display_name, :string
 
-    belongs_to :account, Account,
-      foreign_key: :localpart,
-      references: :localpart,
-      type: :string,
-      primary_key: true
+    belongs_to :account, Account
   end
 
   def changeset(device, params \\ %{}) do
     device
     |> cast(params, [:display_name, :device_id])
-    |> validate_required([:localpart, :device_id])
-    |> unique_constraint([:localpart, :device_id], name: :devices_pkey)
-  end
-
-  def insert_new_access_token(repo, %{
-        device: %Device{localpart: localpart, device_id: device_id} = device
-      }) do
-    access_token = generate_access_token(localpart, device_id)
-
-    device
-    |> change(%{access_token: access_token})
-    |> repo.update()
+    |> validate_required([:device_id])
+    |> unique_constraint([:device_id, :account_id], name: :devices_device_id_account_id_index)
   end
 
   def generate_access_token(localpart, device_id) do
@@ -52,9 +36,9 @@ defmodule MatrixServer.Device do
     "#{localpart}_#{System.os_time(:millisecond)}"
   end
 
-  def login(%Login{} = input, account) do
-    device_id = input.device_id || generate_device_id(account.localpart)
-    access_token = generate_access_token(account.localpart, device_id)
+  def login(input, %Account{localpart: localpart} = account) do
+    device_id = input.device_id || generate_device_id(localpart)
+    access_token = generate_access_token(localpart, device_id)
 
     update_query =
       from(d in Device)
@@ -75,6 +59,6 @@ defmodule MatrixServer.Device do
     Ecto.build_assoc(account, :devices)
     |> Device.changeset(device_params)
     |> put_change(:access_token, access_token)
-    |> Repo.insert(on_conflict: update_query, conflict_target: [:localpart, :device_id])
+    |> Repo.insert(on_conflict: update_query, conflict_target: [:account_id, :device_id])
   end
 end

@@ -66,6 +66,7 @@ defmodule MatrixServerWeb.Router do
         post "/kick", RoomController, :kick
         post "/ban", RoomController, :ban
         post "/unban", RoomController, :unban
+        put "/send/:event_type/:txn_id", RoomController, :send_message
       end
     end
   end

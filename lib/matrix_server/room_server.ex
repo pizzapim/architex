@@ -530,6 +530,7 @@ defmodule MatrixServer.RoomServer do
       room = Room.update_forward_extremities(event, room)
       event = Repo.insert!(event)
       state_set = StateResolution.resolve_forward_extremities(event)
+      # TODO: Do this as a background job, and not after every insert...
       _ = update_joined_rooms(room, state_set)
 
       {:ok, state_set, room}
@@ -539,7 +540,6 @@ defmodule MatrixServer.RoomServer do
   end
 
   # Update local accounts' room membership if applicable.
-  # TODO: Could be a background job.
   @spec update_joined_rooms(Room.t(), t()) :: JoinedRoom.t() | nil
   defp update_joined_rooms(%Room{id: room_id}, state_set) do
     server_name = MatrixServer.server_name()
@@ -553,19 +553,27 @@ defmodule MatrixServer.RoomServer do
         membership == "join"
       end)
 
-    joined_assocs =
-      Enum.map(joined, fn {{_, state_key}, _} ->
-        %{localpart: MatrixServer.get_localpart(state_key), room_id: room_id}
-      end)
+    map_localparts =
+      &Enum.map(&1, fn {{_, state_key}, _} -> MatrixServer.get_localpart(state_key) end)
 
-    not_joined_localparts =
-      Enum.map(not_joined, fn {{_, state_key}, _} -> MatrixServer.get_localpart(state_key) end)
+    joined_localparts = map_localparts.(joined)
+    not_joined_localparts = map_localparts.(not_joined)
 
-    _ = Repo.insert_all(JoinedRoom, joined_assocs, on_conflict: :nothing)
+    _ =
+      Repo.insert_all(
+        JoinedRoom,
+        from(a in Account,
+          where: a.localpart in ^joined_localparts,
+          select: %{account_id: a.id, room_id: ^room_id}
+        ),
+        on_conflict: :nothing
+      )
 
     Repo.delete_all(
       from jr in JoinedRoom,
-        where: jr.room_id == ^room_id and jr.localpart in ^not_joined_localparts
+        join: a in Account,
+        on: a.id == jr.account_id,
+        where: jr.room_id == ^room_id and a.localpart in ^not_joined_localparts
     )
   end
 end

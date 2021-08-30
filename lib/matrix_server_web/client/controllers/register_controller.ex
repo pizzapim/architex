@@ -4,7 +4,7 @@ defmodule MatrixServerWeb.Client.RegisterController do
   import MatrixServerWeb.Error
   import Ecto.Changeset
 
-  alias MatrixServer.{Repo, Account}
+  alias MatrixServer.{Repo, Account, Device}
   alias MatrixServerWeb.Client.Request.Register
   alias Ecto.Changeset
 
@@ -21,14 +21,18 @@ defmodule MatrixServerWeb.Client.RegisterController do
         input = apply_changes(cs)
 
         case Account.register(input) |> Repo.transaction() do
-          {:ok, %{device_with_access_token: device}} ->
-            data = %{user_id: MatrixServer.get_mxid(device.localpart)}
+          {:ok,
+           %{
+             account: %Account{localpart: localpart},
+             device: %Device{device_id: device_id, access_token: access_token}
+           }} ->
+            data = %{user_id: MatrixServer.get_mxid(localpart)}
 
             data =
               if not input.inhibit_login do
                 data
-                |> Map.put(:device_id, device.device_id)
-                |> Map.put(:access_token, device.access_token)
+                |> Map.put(:device_id, device_id)
+                |> Map.put(:access_token, access_token)
               else
                 data
               end
