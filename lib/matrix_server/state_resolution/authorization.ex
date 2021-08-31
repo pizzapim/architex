@@ -1,6 +1,6 @@
 defmodule MatrixServer.StateResolution.Authorization do
   @moduledoc """
-  Implementation of Matrix event authorization rules for stat resolution.
+  Implementation of Matrix event authorization rules for state resolution.
 
   Note that some authorization rules are already checked in
   `MatrixServer.Event.prevalidate/1` so they are skipped here.
@@ -156,9 +156,14 @@ defmodule MatrixServer.StateResolution.Authorization do
 
     # Check rules: 8, 9
     cond do
-      not has_power_level?(to_string(sender), power_levels, {:event, event}) -> false
-      String.starts_with?(state_key, "@") and state_key != sender -> false
-      true -> __authorized?(event, state_set)
+      not has_power_level?(to_string(sender), power_levels, {:event, event}) ->
+        false
+
+      is_binary(state_key) and String.starts_with?(state_key, "@") and state_key != sender ->
+        false
+
+      true ->
+        __authorized?(event, state_set)
     end
   end
 

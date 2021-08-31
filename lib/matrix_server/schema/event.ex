@@ -10,7 +10,7 @@ defmodule MatrixServer.Event do
   @type t :: %__MODULE__{
           type: String.t(),
           origin_server_ts: integer(),
-          state_key: String.t(),
+          state_key: String.t() | nil,
           sender: UserId.t(),
           content: map(),
           prev_events: [String.t()] | nil,
@@ -73,6 +73,15 @@ defmodule MatrixServer.Event do
     }
   end
 
+  @spec custom_message(Room.t(), Account.t(), String.t(), map()) :: t()
+  def custom_message(room, sender, type, content) do
+    %Event{
+      Event.new(room, sender)
+      | type: type,
+        content: content
+    }
+  end
+
   @spec is_control_event(t()) :: boolean()
   def is_control_event(%Event{type: "m.room.power_levels", state_key: ""}), do: true
   def is_control_event(%Event{type: "m.room.join_rules", state_key: ""}), do: true
@@ -131,7 +140,7 @@ defmodule MatrixServer.Event do
       length(prev_events) == length(prev_event_ids) and
       not MatrixServer.has_duplicates?(state_pairs) and
       valid_auth_events?(event, auth_events) and
-      Enum.find_value(state_pairs, &(&1 == {"m.room.create", ""})) and
+      Enum.find_value(state_pairs, false, &(&1 == {"m.room.create", ""})) and
       do_prevalidate(event, auth_events, prev_events)
   end
 

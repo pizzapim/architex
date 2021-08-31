@@ -63,7 +63,7 @@ defmodule MatrixServer.Repo.Migrations.CreateInitialTables do
 
     create table(:devices) do
       add :device_id, :string, null: false
-      add :access_token, :string
+      add :access_token, :string, null: false
       add :display_name, :string
 
       add :account_id, references(:accounts, on_delete: :delete_all), null: false
@@ -72,5 +72,11 @@ defmodule MatrixServer.Repo.Migrations.CreateInitialTables do
     create index(:devices, [:device_id, :account_id], unique: true)
     create index(:devices, [:account_id])
     create index(:devices, [:access_token], unique: true)
+
+    create table(:device_transactions, primary_key: false) do
+      add :txn_id, :string, primary_key: true, null: false
+      add :device_id, references(:devices, on_delete: :delete_all), primary_key: true, null: false
+      add :event_id, :string, null: false
+    end
   end
 end

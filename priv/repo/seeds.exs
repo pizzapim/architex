@@ -1,12 +1,15 @@
-alias MatrixServer.{Repo, Account, Device}
+alias MatrixServer.{Repo, Account}
 
-Repo.insert!(%Account{
-  localpart: "chuck",
-  password_hash: Bcrypt.hash_pwd_salt("sneed")
-})
+account =
+  Repo.insert!(%Account{
+    localpart: "chuck",
+    password_hash: Bcrypt.hash_pwd_salt("sneed")
+  })
 
-Repo.insert(%Device{
+account
+|> Ecto.build_assoc(:devices,
   device_id: "android",
   display_name: "My Android",
-  localpart: "chuck"
-})
+  access_token: "sneed"
+)
+|> Repo.insert!()

@@ -208,13 +208,28 @@ defmodule MatrixServerWeb.Client.RoomController do
 
   def unban(conn, _), do: put_error(conn, :missing_param)
 
-  def send_message(%Conn{assigns: %{account: account}, body_params: body_params} = conn, %{
-        "room_id" => room_id,
-        "event_type" => event_type,
-        "txn_id" => txn_id
-      }) do
-    conn
-    |> send_resp(200, [])
-    |> halt()
+  def send_message(
+        %Conn{assigns: %{account: account, device: device}, body_params: body_params} = conn,
+        %{
+          "room_id" => room_id,
+          "event_type" => event_type,
+          "txn_id" => txn_id
+        }
+      ) do
+    case RoomServer.get_room_server(room_id) do
+      {:ok, pid} ->
+        case RoomServer.send_message(pid, account, device, event_type, body_params, txn_id) do
+          {:ok, event_id} ->
+            conn
+            |> put_status(200)
+            |> json(%{event_id: event_id})
+
+          {:error, _} ->
+            put_error(conn, :unknown)
+        end
+
+      {:error, :not_found} ->
+        put_error(conn, :not_found, "The given room was not found.")
+    end
   end
 end

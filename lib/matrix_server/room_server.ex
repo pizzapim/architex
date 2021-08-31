@@ -13,7 +13,17 @@ defmodule MatrixServer.RoomServer do
   import Ecto.Query
   import Ecto.Changeset
 
-  alias MatrixServer.{Repo, Room, Event, StateResolution, Account, JoinedRoom}
+  alias MatrixServer.{
+    Repo,
+    Room,
+    Event,
+    StateResolution,
+    Account,
+    JoinedRoom,
+    Device,
+    DeviceTransaction
+  }
+
   alias MatrixServer.StateResolution.Authorization
   alias MatrixServerWeb.Client.Request.{CreateRoom, Kick, Ban}
 
@@ -154,6 +164,15 @@ defmodule MatrixServer.RoomServer do
     GenServer.call(pid, {:set_visibility, account, visibility})
   end
 
+  @doc """
+  Send a message to this room.
+  """
+  @spec send_message(pid(), Account.t(), Device.t(), String.t(), map(), String.t()) ::
+          {:ok, String.t()} | {:error, atom()}
+  def send_message(pid, account, device, event_type, content, txn_id) do
+    GenServer.call(pid, {:send_message, account, device, event_type, content, txn_id})
+  end
+
   ### Implementation
 
   @impl true
@@ -248,8 +267,8 @@ defmodule MatrixServer.RoomServer do
   def handle_call({:invite, account, user_id}, _from, %{room: room, state_set: state_set} = state) do
     invite_event = Event.Invite.new(room, account, user_id)
 
-    case insert_single_event(room, state_set, invite_event) do
-      {:ok, {state_set, room}} -> {:reply, :ok, %{state | state_set: state_set, room: room}}
+    case Repo.transaction(insert_single_event(room, state_set, invite_event)) do
+      {:ok, {state_set, room, _}} -> {:reply, :ok, %{state | state_set: state_set, room: room}}
       {:error, reason} -> {:reply, {:error, reason}, state}
     end
   end
@@ -261,8 +280,8 @@ defmodule MatrixServer.RoomServer do
       ) do
     join_event = Event.Join.new(room, account)
 
-    case insert_single_event(room, state_set, join_event) do
-      {:ok, {state_set, room}} ->
+    case Repo.transaction(insert_single_event(room, state_set, join_event)) do
+      {:ok, {state_set, room, _}} ->
         {:reply, {:ok, room_id}, %{state | state_set: state_set, room: room}}
 
       {:error, reason} ->
@@ -273,8 +292,8 @@ defmodule MatrixServer.RoomServer do
   def handle_call({:leave, account}, _from, %{room: room, state_set: state_set} = state) do
     leave_event = Event.Leave.new(room, account)
 
-    case insert_single_event(room, state_set, leave_event) do
-      {:ok, {state_set, room}} -> {:reply, :ok, %{state | state_set: state_set, room: room}}
+    case Repo.transaction(insert_single_event(room, state_set, leave_event)) do
+      {:ok, {state_set, room, _}} -> {:reply, :ok, %{state | state_set: state_set, room: room}}
       {:error, reason} -> {:reply, {:error, reason}, state}
     end
   end
@@ -286,8 +305,8 @@ defmodule MatrixServer.RoomServer do
       ) do
     kick_event = Event.Kick.new(room, account, user_id, reason)
 
-    case insert_single_event(room, state_set, kick_event) do
-      {:ok, {state_set, room}} -> {:reply, :ok, %{state | state_set: state_set, room: room}}
+    case Repo.transaction(insert_single_event(room, state_set, kick_event)) do
+      {:ok, {state_set, room, _}} -> {:reply, :ok, %{state | state_set: state_set, room: room}}
       {:error, reason} -> {:reply, {:error, reason}, state}
     end
   end
@@ -299,8 +318,8 @@ defmodule MatrixServer.RoomServer do
       ) do
     ban_event = Event.Ban.new(room, account, user_id, reason)
 
-    case insert_single_event(room, state_set, ban_event) do
-      {:ok, {state_set, room}} -> {:reply, :ok, %{state | state_set: state_set, room: room}}
+    case Repo.transaction(insert_single_event(room, state_set, ban_event)) do
+      {:ok, {state_set, room, _}} -> {:reply, :ok, %{state | state_set: state_set, room: room}}
       {:error, reason} -> {:reply, {:error, reason}, state}
     end
   end
@@ -308,8 +327,8 @@ defmodule MatrixServer.RoomServer do
   def handle_call({:unban, account, user_id}, _from, %{room: room, state_set: state_set} = state) do
     unban_event = Event.Unban.new(room, account, user_id)
 
-    case insert_single_event(room, state_set, unban_event) do
-      {:ok, {state_set, room}} -> {:reply, :ok, %{state | state_set: state_set, room: room}}
+    case Repo.transaction(insert_single_event(room, state_set, unban_event)) do
+      {:ok, {state_set, room, _}} -> {:reply, :ok, %{state | state_set: state_set, room: room}}
       {:error, reason} -> {:reply, {:error, reason}, state}
     end
   end
@@ -334,18 +353,64 @@ defmodule MatrixServer.RoomServer do
     end
   end
 
-  @spec insert_single_event(Room.t(), t(), Event.t()) :: {:ok, {t(), Room.t()}} | {:error, atom()}
+  def handle_call(
+        {:send_message, account, device, event_type, content, txn_id},
+        _from,
+        %{room: room, state_set: state_set} = state
+      ) do
+    message_event = Event.custom_message(room, account, event_type, content)
+
+    case Repo.transaction(insert_custom_message(state_set, room, device, message_event, txn_id)) do
+      {:ok, {state_set, room, event_id}} ->
+        {:reply, {:ok, event_id}, %{state | state_set: state_set, room: room}}
+
+      {:error, reason} ->
+        {:reply, {:error, reason}, state}
+    end
+  end
+
+  defp insert_custom_message(
+         state_set,
+         room,
+         %Device{id: device_id} = device,
+         message_event,
+         txn_id
+       ) do
+    fn ->
+      # Check if we already executed this transaction.
+      case Repo.one(
+             from dt in DeviceTransaction,
+               where: dt.txn_id == ^txn_id and dt.device_id == ^device_id
+           ) do
+        %DeviceTransaction{event_id: event_id} ->
+          {state_set, room, event_id}
+
+        nil ->
+          with {state_set, room, %Event{event_id: event_id}} <-
+                 insert_single_event(room, state_set, message_event).() do
+            # Mark this transaction as done.
+            Ecto.build_assoc(device, :device_transactions, txn_id: txn_id, event_id: event_id)
+            |> Repo.insert!()
+
+            {state_set, room, event_id}
+          end
+      end
+    end
+  end
+
+  @spec insert_single_event(Room.t(), t(), Event.t()) ::
+          (() -> {t(), Room.t(), Event.t()} | {:error, atom()})
   defp insert_single_event(room, state_set, event) do
-    Repo.transaction(fn ->
+    fn ->
       case finalize_and_insert_event(event, state_set, room) do
-        {:ok, state_set, room} ->
+        {:ok, state_set, room, event} ->
           _ = update_room_state_set(room, state_set)
-          {state_set, room}
+          {state_set, room, event}
 
         {:error, reason} ->
           Repo.rollback(reason)
       end
-    end)
+    end
   end
 
   # Get a function that inserts all events for room creation.
@@ -374,7 +439,7 @@ defmodule MatrixServer.RoomServer do
       result =
         Enum.reduce_while(events, {%{}, room}, fn event, {state_set, room} ->
           case finalize_and_insert_event(event, state_set, room) do
-            {:ok, state_set, room} -> {:cont, {state_set, room}}
+            {:ok, state_set, room, _} -> {:cont, {state_set, room}}
             {:error, reason} -> {:halt, {:error, reason}}
           end
         end)
@@ -441,7 +506,7 @@ defmodule MatrixServer.RoomServer do
   # - Event ID
   # - Signature
   @spec finalize_and_insert_event(Event.t(), t(), Room.t()) ::
-          {:ok, t(), Room.t()} | {:error, atom()}
+          {:ok, t(), Room.t(), Event.t()} | {:error, atom()}
   defp finalize_and_insert_event(
          event,
          state_set,
@@ -512,7 +577,7 @@ defmodule MatrixServer.RoomServer do
   # Implements the checks as described in the
   # [Matrix docs](https://matrix.org/docs/spec/server_server/latest#checks-performed-on-receipt-of-a-pdu).
   @spec authenticate_and_insert_event(Event.t(), t(), Room.t()) ::
-          {:ok, t(), Room.t()} | {:error, atom()}
+          {:ok, t(), Room.t(), Event.t()} | {:error, atom()}
   defp authenticate_and_insert_event(event, current_state_set, room) do
     # TODO: Correctly handle soft fails.
     # Check the following things:
@@ -533,7 +598,7 @@ defmodule MatrixServer.RoomServer do
       # TODO: Do this as a background job, and not after every insert...
       _ = update_joined_rooms(room, state_set)
 
-      {:ok, state_set, room}
+      {:ok, state_set, room, event}
     else
       _ -> {:error, :authorization}
     end

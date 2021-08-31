@@ -3,7 +3,7 @@ defmodule MatrixServer.Device do
 
   import Ecto.{Changeset, Query}
 
-  alias MatrixServer.{Account, Device, Repo}
+  alias MatrixServer.{Account, Device, Repo, DeviceTransaction}
   alias MatrixServerWeb.Client.Request.Login
 
   @type t :: %__MODULE__{
@@ -19,6 +19,7 @@ defmodule MatrixServer.Device do
     field :display_name, :string
 
     belongs_to :account, Account
+    has_many :device_transactions, DeviceTransaction
   end
 
   def changeset(device, params \\ %{}) do
