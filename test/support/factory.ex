@@ -1,7 +1,7 @@
-defmodule MatrixServer.Factory do
-  use ExMachina.Ecto, repo: MatrixServer.Repo
+defmodule Architex.Factory do
+  use ExMachina.Ecto, repo: Architex.Repo
 
-  alias MatrixServer.{Account, Device}
+  alias Architex.{Account, Device}
 
   def account_factory do
     %Account{

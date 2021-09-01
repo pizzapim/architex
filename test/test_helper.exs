@@ -1,2 +1,2 @@
 ExUnit.start()
-Ecto.Adapters.SQL.Sandbox.mode(MatrixServer.Repo, :manual)
+Ecto.Adapters.SQL.Sandbox.mode(Architex.Repo, :manual)

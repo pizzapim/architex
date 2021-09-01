@@ -1,10 +1,10 @@
-defmodule MatrixServerWeb.RegisterControllerTest do
-  use MatrixServerWeb.ConnCase
+defmodule ArchitexWeb.RegisterControllerTest do
+  use ArchitexWeb.ConnCase
 
   import Ecto.Query
 
-  alias MatrixServer.{Repo, Device, Factory}
-  alias MatrixServerWeb.Endpoint
+  alias Architex.{Repo, Device, Factory}
+  alias ArchitexWeb.Endpoint
 
   @basic_params %{
     "username" => "user",
@@ -22,7 +22,7 @@ defmodule MatrixServerWeb.RegisterControllerTest do
 
     test "registers account with minimal information", %{conn: conn} do
       conn = post_json(conn, Routes.register_path(Endpoint, :register), @basic_params)
-      user_id = MatrixServer.get_mxid("user")
+      user_id = Architex.get_mxid("user")
 
       assert %{"access_token" => _, "device_id" => _, "user_id" => ^user_id} =
                json_response(conn, 200)

@@ -1,9 +1,9 @@
-defmodule MatrixServer.MixProject do
+defmodule Architex.MixProject do
   use Mix.Project
 
   def project do
     [
-      app: :matrix_server,
+      app: :architex,
       version: "0.1.0",
       elixir: "~> 1.7",
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -23,7 +23,7 @@ defmodule MatrixServer.MixProject do
   # Type `mix help compile.app` for more information.
   def application do
     [
-      mod: {MatrixServer.Application, []},
+      mod: {Architex.Application, []},
       extra_applications: [:logger, :runtime_tools]
     ]
   end

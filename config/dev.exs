@@ -4,10 +4,10 @@ hostname = "localhost"
 port = System.get_env("PORT") || 4000
 
 # Configure your database
-config :matrix_server, MatrixServer.Repo,
-  username: "matrix_server",
-  password: "matrix_server",
-  database: "matrix_server_dev",
+config :architex, Architex.Repo,
+  username: "architex",
+  password: "architex",
+  database: "architex_dev",
   hostname: hostname,
   show_sensitive_data_on_connection_error: true,
   pool_size: 10
@@ -18,7 +18,7 @@ config :matrix_server, MatrixServer.Repo,
 # The watchers configuration can be used to run external
 # watchers to your application. For example, we use it
 # with webpack to recompile .js and .css sources.
-config :matrix_server, MatrixServerWeb.Endpoint,
+config :architex, ArchitexWeb.Endpoint,
   http: [port: port],
   debug_errors: true,
   code_reloader: true,
@@ -59,5 +59,5 @@ config :phoenix, :stacktrace_depth, 20
 # Initialize plugs at runtime for faster development compilation
 config :phoenix, :plug_init_mode, :runtime
 
-config :matrix_server, server_name: "#{hostname}:#{port}"
-config :matrix_server, private_key_file: "keys/id_ed25519"
+config :architex, server_name: "#{hostname}:#{port}"
+config :architex, private_key_file: "keys/id_ed25519"

@@ -1,4 +1,4 @@
-alias MatrixServer.{Repo, Account}
+alias Architex.{Repo, Account}
 
 account =
   Repo.insert!(%Account{

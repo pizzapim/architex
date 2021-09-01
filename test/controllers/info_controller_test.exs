@@ -1,5 +1,5 @@
-defmodule MatrixServerWeb.InfoControllerTest do
-  use MatrixServerWeb.ConnCase
+defmodule ArchitexWeb.InfoControllerTest do
+  use ArchitexWeb.ConnCase
 
   test "versions endpoint returns a list of supported Matrix spec versions", %{conn: conn} do
     conn = get(conn, Routes.info_path(conn, :versions))
@@ -9,7 +9,7 @@ defmodule MatrixServerWeb.InfoControllerTest do
   end
 
   test "unrecognized route renders M_UNRECOGNIZED error", %{conn: conn} do
-    conn = get(conn, MatrixServerWeb.Endpoint.url() <> "/sneed")
+    conn = get(conn, ArchitexWeb.Endpoint.url() <> "/sneed")
 
     assert %{"errcode" => "M_UNRECOGNIZED"} = json_response(conn, 400)
   end

@@ -1,4 +1,4 @@
-defmodule MatrixServer.Repo.Migrations.CreateInitialTables do
+defmodule Architex.Repo.Migrations.CreateInitialTables do
   use Ecto.Migration
 
   def change do

@@ -7,15 +7,15 @@
 # General application configuration
 use Mix.Config
 
-config :matrix_server,
-  ecto_repos: [MatrixServer.Repo]
+config :architex,
+  ecto_repos: [Architex.Repo]
 
 # Configures the endpoint
-config :matrix_server, MatrixServerWeb.Endpoint,
+config :architex, ArchitexWeb.Endpoint,
   url: [host: "localhost"],
   secret_key_base: "npI0xfNYxf5FoTIdAoc7er0ZvdCJgQFZQ9LcpUFL6dsPXyQllMv45zaQQoO4ZLu1",
-  render_errors: [view: MatrixServerWeb.ErrorView, accepts: ~w(json), layout: false],
-  pubsub_server: MatrixServer.PubSub,
+  render_errors: [view: ArchitexWeb.ErrorView, accepts: ~w(json), layout: false],
+  pubsub_server: Architex.PubSub,
   live_view: [signing_salt: "6ymoi3Gx"]
 
 # Configures Elixir's Logger
@@ -26,7 +26,7 @@ config :logger, :console,
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
 
-config :matrix_server, MatrixServer.Repo, migration_timestamps: [type: :utc_datetime]
+config :architex, Architex.Repo, migration_timestamps: [type: :utc_datetime]
 
 config :cors_plug,
   origin: ["*"],
