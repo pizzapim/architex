@@ -16,7 +16,7 @@ defmodule ArchitexWeb.Federation.EventController do
   def event(%Plug.Conn{assigns: %{origin: origin}} = conn, %{"event_id" => event_id}) do
     query =
       Event
-      |> where([e], e.event_id == ^event_id)
+      |> where([e], e.id == ^event_id)
       |> preload(:room)
 
     case Repo.one(query) do
@@ -82,7 +82,7 @@ defmodule ArchitexWeb.Federation.EventController do
   defp get_state_or_state_ids(conn, state_or_state_ids, origin, event_id, room_id) do
     query =
       Event
-      |> where([e], e.event_id == ^event_id and e.room_id == ^room_id)
+      |> where([e], e.id == ^event_id and e.room_id == ^room_id)
       |> preload(:room)
 
     case Repo.one(query) do

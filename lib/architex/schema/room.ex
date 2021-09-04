@@ -18,7 +18,7 @@ defmodule Architex.Room do
     field :visibility, Ecto.Enum, values: [:public, :private]
     field :state, {:array, {:array, :string}}
     field :forward_extremities, {:array, :string}
-    has_many :events, Event, foreign_key: :event_id
+    has_many :events, Event, foreign_key: :room_id
     has_many :aliases, Alias, foreign_key: :room_id
   end
 
@@ -39,7 +39,7 @@ defmodule Architex.Room do
 
   def update_forward_extremities(
         %Event{
-          event_id: event_id,
+          id: event_id,
           prev_events: prev_event_ids
         },
         %Room{id: room_id, forward_extremities: forward_extremities}

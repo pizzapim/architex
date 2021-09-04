@@ -40,7 +40,7 @@ defmodule ArchitexWeb.Client.LoginController do
         case Account.login(input) |> Repo.transaction() do
           {:ok,
            {%Account{localpart: localpart},
-            %Device{access_token: access_token, device_id: device_id}}} ->
+            %Device{access_token: access_token, id: device_id}}} ->
             data = %{
               user_id: Architex.get_mxid(localpart),
               access_token: access_token,

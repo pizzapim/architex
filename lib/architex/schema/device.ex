@@ -7,14 +7,16 @@ defmodule Architex.Device do
   alias ArchitexWeb.Client.Request.Login
 
   @type t :: %__MODULE__{
-          device_id: String.t(),
+          nid: integer(),
+          id: String.t(),
           access_token: String.t(),
           display_name: String.t(),
           account_id: integer()
         }
 
+  @primary_key {:nid, :id, autogenerate: true}
   schema "devices" do
-    field :device_id, :string
+    field :id, :string
     field :access_token, :string, redact: true
     field :display_name, :string
 
@@ -24,9 +26,9 @@ defmodule Architex.Device do
 
   def changeset(device, params \\ %{}) do
     device
-    |> cast(params, [:display_name, :device_id])
-    |> validate_required([:device_id])
-    |> unique_constraint([:device_id, :account_id], name: :devices_device_id_account_id_index)
+    |> cast(params, [:display_name, :id])
+    |> validate_required([:id])
+    |> unique_constraint([:id, :account_id], name: :devices_id_account_id_index)
   end
 
   def generate_access_token(localpart, device_id) do
@@ -47,7 +49,7 @@ defmodule Architex.Device do
 
     update_query =
       from(d in Device)
-      |> update(set: [access_token: ^access_token, device_id: ^device_id])
+      |> update(set: [access_token: ^access_token, id: ^device_id])
       |> then(fn q ->
         if initial_device_display_name do
           update(q, set: [display_name: ^initial_device_display_name])
@@ -57,13 +59,13 @@ defmodule Architex.Device do
       end)
 
     device_params = %{
-      device_id: device_id,
+      id: device_id,
       display_name: initial_device_display_name
     }
 
     Ecto.build_assoc(account, :devices)
     |> Device.changeset(device_params)
     |> put_change(:access_token, access_token)
-    |> Repo.insert(on_conflict: update_query, conflict_target: [:account_id, :device_id])
+    |> Repo.insert(on_conflict: update_query, conflict_target: [:account_id, :id])
   end
 end

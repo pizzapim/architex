@@ -31,7 +31,7 @@ defmodule Architex.StateResolution do
     room_events =
       Event
       |> where([e], e.room_id == ^room_id)
-      |> select([e], {e.event_id, e})
+      |> select([e], {e.id, e})
       |> Repo.all()
       |> Enum.into(%{})
 
@@ -61,14 +61,14 @@ defmodule Architex.StateResolution do
     room_events =
       Event
       |> where([e], e.room_id == ^room_id)
-      |> select([e], {e.event_id, e})
+      |> select([e], {e.id, e})
       |> Repo.all()
       |> Enum.into(%{})
 
     Event
     |> where([e], e.room_id == ^room_id)
     |> join(:inner, [e], r in Room, on: e.room_id == r.id)
-    |> where([e, r], e.event_id == fragment("ANY(?)", r.forward_extremities))
+    |> where([e, r], e.id == fragment("ANY(?)", r.forward_extremities))
     |> Repo.all()
     |> Enum.map(&resolve/1)
     |> do_resolve(room_events)
@@ -141,7 +141,7 @@ defmodule Architex.StateResolution do
       |> Enum.into(%{}, fn state_pair ->
         events =
           Enum.map(state_sets, fn
-            state_set when is_map_key(state_set, state_pair) -> state_set[state_pair].event_id
+            state_set when is_map_key(state_set, state_pair) -> state_set[state_pair].id
             _ -> nil
           end)
           |> MapSet.new()
@@ -185,7 +185,7 @@ defmodule Architex.StateResolution do
   defp auth_chain(%Event{auth_events: auth_events}, room_events) do
     auth_events
     |> Enum.map(&room_events[&1])
-    |> Enum.reduce(MapSet.new(), fn %Event{event_id: auth_event_id} = auth_event, acc ->
+    |> Enum.reduce(MapSet.new(), fn %Event{id: auth_event_id} = auth_event, acc ->
       auth_event
       |> auth_chain(room_events)
       |> MapSet.union(acc)
@@ -194,8 +194,8 @@ defmodule Architex.StateResolution do
   end
 
   defp rev_top_pow_order(room_events) do
-    fn %Event{origin_server_ts: timestamp1, event_id: event_id1} = event1,
-       %Event{origin_server_ts: timestamp2, event_id: event_id2} = event2 ->
+    fn %Event{origin_server_ts: timestamp1, id: event_id1} = event1,
+       %Event{origin_server_ts: timestamp2, id: event_id2} = event2 ->
       power1 = get_power_level(event1, room_events)
       power2 = get_power_level(event2, room_events)
 

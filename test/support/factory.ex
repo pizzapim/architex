@@ -15,7 +15,7 @@ defmodule Architex.Factory do
     device_id = sequence(:device_id, &"device#{&1}")
 
     %Device{
-      device_id: device_id,
+      id: device_id,
       access_token: Device.generate_access_token(localpart, device_id),
       display_name: sequence(:display_name, &"Device #{&1}"),
       account: account

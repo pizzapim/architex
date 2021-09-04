@@ -23,7 +23,7 @@ defmodule Architex.StateResolution.Authorization do
   def authorized?(
         %Event{type: "m.room.member", state_key: state_key, prev_events: [create_id]},
         %{
-          {"m.room.create", ""} => %Event{event_id: create_id, content: %{"creator" => creator}}
+          {"m.room.create", ""} => %Event{id: create_id, content: %{"creator" => creator}}
         }
       ),
       do: state_key == creator
@@ -306,7 +306,7 @@ defmodule Architex.StateResolution.Authorization do
     # We assume the auth events are validated beforehand.
     state_set =
       Event
-      |> where([e], e.event_id in ^auth_event_ids)
+      |> where([e], e.id in ^auth_event_ids)
       |> Repo.all()
       |> Enum.reduce(%{}, &update_state_set/2)
 

@@ -24,7 +24,7 @@ defmodule ArchitexWeb.Client.RegisterController do
           {:ok,
            %{
              account: %Account{localpart: localpart},
-             device: %Device{device_id: device_id, access_token: access_token}
+             device: %Device{id: device_id, access_token: access_token}
            }} ->
             data = %{user_id: Architex.get_mxid(localpart)}
 

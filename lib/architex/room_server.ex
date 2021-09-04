@@ -183,7 +183,7 @@ defmodule Architex.RoomServer do
 
     state_set =
       Event
-      |> where([e], e.event_id in ^state_event_ids)
+      |> where([e], e.id in ^state_event_ids)
       |> Repo.all()
       |> Enum.into(%{}, fn %Event{type: type, state_key: state_key} = event ->
         {{type, state_key}, event}
@@ -228,7 +228,7 @@ defmodule Architex.RoomServer do
     room_events =
       Event
       |> where([e], e.room_id == ^room_id)
-      |> select([e], {e.event_id, e})
+      |> select([e], {e.id, e})
       |> Repo.all()
       |> Enum.into(%{})
 
@@ -248,12 +248,12 @@ defmodule Architex.RoomServer do
     room_events =
       Event
       |> where([e], e.room_id == ^room_id)
-      |> select([e], {e.event_id, e})
+      |> select([e], {e.id, e})
       |> Repo.all()
       |> Enum.into(%{})
 
     state_set = StateResolution.resolve(event, false)
-    state_events = Enum.map(state_set, fn {_, %Event{event_id: event_id}} -> event_id end)
+    state_events = Enum.map(state_set, fn {_, %Event{id: event_id}} -> event_id end)
 
     auth_chain =
       state_set
@@ -372,7 +372,7 @@ defmodule Architex.RoomServer do
   defp insert_custom_message(
          state_set,
          room,
-         %Device{id: device_id} = device,
+         %Device{nid: device_nid} = device,
          message_event,
          txn_id
        ) do
@@ -380,13 +380,13 @@ defmodule Architex.RoomServer do
       # Check if we already executed this transaction.
       case Repo.one(
              from dt in DeviceTransaction,
-               where: dt.txn_id == ^txn_id and dt.device_id == ^device_id
+               where: dt.txn_id == ^txn_id and dt.device_nid == ^device_nid
            ) do
         %DeviceTransaction{event_id: event_id} ->
           {state_set, room, event_id}
 
         nil ->
-          with {state_set, room, %Event{event_id: event_id}} <-
+          with {state_set, room, %Event{id: event_id}} <-
                  insert_single_event(room, state_set, message_event).() do
             # Mark this transaction as done.
             Ecto.build_assoc(device, :device_transactions, txn_id: txn_id, event_id: event_id)
@@ -462,7 +462,7 @@ defmodule Architex.RoomServer do
     #       instead of the state_set state.
     #       Create custom type for this.
     serialized_state_set =
-      Enum.map(state_set, fn {{type, state_key}, %Event{event_id: event_id}} ->
+      Enum.map(state_set, fn {{type, state_key}, %Event{id: event_id}} ->
         [type, state_key, event_id]
       end)
 
@@ -538,7 +538,7 @@ defmodule Architex.RoomServer do
     state_set
     |> Map.take(state_pairs)
     |> Map.values()
-    |> Enum.map(fn %Event{event_id: event_id} -> event_id end)
+    |> Enum.map(fn %Event{id: event_id} -> event_id end)
   end
 
   # Get the auth events specific to m.room.member events.

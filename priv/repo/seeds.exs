@@ -8,7 +8,7 @@ account =
 
 account
 |> Ecto.build_assoc(:devices,
-  device_id: "android",
+  id: "android",
   display_name: "My Android",
   access_token: "sneed"
 )

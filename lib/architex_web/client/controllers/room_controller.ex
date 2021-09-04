@@ -232,4 +232,13 @@ defmodule ArchitexWeb.Client.RoomController do
         put_error(conn, :not_found, "The given room was not found.")
     end
   end
+
+  # GET /_matrix/client/r0/rooms/!atYDsyowueiToUvuqY:localhost:4000/messages
+  # Parameters: %{"dir" => "b", "from" => "", "limit" => "727", "path" => ["_matrix", "client", "r0", "rooms", "!atYDsyowueiToUvuqY:localhost:4000", "messages"]}
+  def message(conn, params) do
+
+    conn
+    |> send_resp(400, [])
+    |> halt()
+  end
 end

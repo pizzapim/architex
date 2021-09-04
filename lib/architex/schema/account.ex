@@ -71,7 +71,7 @@ defmodule Architex.Account do
 
       device_params = %{
         display_name: initial_device_display_name,
-        device_id: device_id
+        id: device_id
       }
 
       Ecto.build_assoc(account, :devices, access_token: access_token)

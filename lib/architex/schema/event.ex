@@ -20,7 +20,7 @@ defmodule Architex.Event do
           hashes: map() | nil
         }
 
-  @primary_key {:event_id, :string, []}
+  @primary_key {:nid, :id, autogenerate: true}
   schema "events" do
     field :type, :string
     field :origin_server_ts, :integer
@@ -32,6 +32,7 @@ defmodule Architex.Event do
     field :unsigned, :map
     field :signatures, {:map, {:map, :string}}
     field :hashes, {:map, :string}
+    field :id, :string
 
     belongs_to :room, Room, type: :string
   end
@@ -125,12 +126,12 @@ defmodule Architex.Event do
   def prevalidate(%Event{auth_events: auth_event_ids, prev_events: prev_event_ids} = event) do
     prev_events =
       Event
-      |> where([e], e.event_id in ^prev_event_ids)
+      |> where([e], e.id in ^prev_event_ids)
       |> Repo.all()
 
     auth_events =
       Event
-      |> where([e], e.event_id in ^auth_event_ids)
+      |> where([e], e.id in ^auth_event_ids)
       |> Repo.all()
 
     state_pairs = Enum.map(auth_events, &{&1.type, &1.state_key})
@@ -237,7 +238,7 @@ defmodule Architex.Event do
       event
       |> Architex.to_serializable_map()
       |> Map.take([
-        :event_id,
+        :id,
         :type,
         :room_id,
         :sender,
@@ -305,7 +306,7 @@ defmodule Architex.Event do
   @spec set_event_id(t()) :: {:ok, t()} | {:error, Jason.EncodeError.t()}
   def set_event_id(event) do
     with {:ok, event_id} <- generate_event_id(event) do
-      {:ok, %Event{event | event_id: event_id}}
+      {:ok, %Event{event | id: event_id}}
     end
   end
 
