@@ -6,7 +6,7 @@ defmodule Architex.Event do
   alias Architex.{Repo, Room, Event, Account, EncodableMap, KeyServer}
   alias Architex.Types.UserId
 
-  # TODO: Could refactor to also always set prev_events, but not necessary.
+  # TODO: It seems unsigned is always set, even though it is not specified?
   @type t :: %__MODULE__{
           type: String.t(),
           origin_server_ts: integer(),
@@ -37,6 +37,7 @@ defmodule Architex.Event do
     belongs_to :room, Room, type: :string
   end
 
+  # TODO: Move this to a dedicated function in Event.Formatters.
   defimpl Jason.Encoder, for: Event do
     @pdu_keys [
       :auth_events,

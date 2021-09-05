@@ -4,9 +4,9 @@ defmodule ArchitexWeb.Client.RoomController do
   import ArchitexWeb.Error
   import Ecto.{Changeset, Query}
 
-  alias Architex.{Repo, Room, RoomServer}
+  alias Architex.{Repo, Room, RoomServer, Event}
   alias Architex.Types.UserId
-  alias ArchitexWeb.Client.Request.{CreateRoom, Kick, Ban}
+  alias ArchitexWeb.Client.Request.{CreateRoom, Kick, Ban, Messages}
   alias Ecto.Changeset
   alias Plug.Conn
 
@@ -50,13 +50,9 @@ defmodule ArchitexWeb.Client.RoomController do
       |> select([jr], jr.id)
       |> Repo.all()
 
-    data = %{
-      joined_rooms: joined_room_ids
-    }
-
     conn
     |> put_status(200)
-    |> json(data)
+    |> json(%{joined_rooms: joined_room_ids})
   end
 
   @doc """
@@ -235,10 +231,32 @@ defmodule ArchitexWeb.Client.RoomController do
 
   # GET /_matrix/client/r0/rooms/!atYDsyowueiToUvuqY:localhost:4000/messages
   # Parameters: %{"dir" => "b", "from" => "", "limit" => "727", "path" => ["_matrix", "client", "r0", "rooms", "!atYDsyowueiToUvuqY:localhost:4000", "messages"]}
-  def message(conn, params) do
+  def messages(%Conn{assigns: %{account: account}} = conn, %{"room_id" => room_id} = params) do
+    # IO.inspect(Messages.changeset(%Messages{}, params))
 
-    conn
-    |> send_resp(400, [])
-    |> halt()
+    with {:ok, request} <- Messages.parse(params) do
+      room_query =
+        account
+        |> Ecto.assoc(:joined_rooms)
+        |> where([r], r.id == ^room_id)
+
+      case Repo.one(room_query) do
+        %Room{} = room ->
+          {events, start, end_} = Room.get_messages(room, request)
+          events = Enum.map(events, &Event.Formatters.for_client/1)
+          data = %{chunk: events}
+          data = if start, do: Map.put(data, :start, start), else: data
+          data = if end_, do: Map.put(data, :end, end_), else: data
+
+          conn
+          |> put_status(200)
+          |> json(data)
+
+        nil ->
+          put_error(conn, :forbidden, "You are not participating in this room.")
+      end
+    else
+      {:error, _} -> put_error(conn, :bad_json)
+    end
   end
 end

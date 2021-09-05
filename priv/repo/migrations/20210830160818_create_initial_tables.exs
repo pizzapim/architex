@@ -43,6 +43,7 @@ defmodule Architex.Repo.Migrations.CreateInitialTables do
     end
 
     create index(:events, [:id], unique: true)
+    create index(:events, [:origin_server_ts])
 
     create table(:server_key_info, primary_key: false) do
       add :valid_until, :bigint, default: 0, null: false
@@ -80,7 +81,10 @@ defmodule Architex.Repo.Migrations.CreateInitialTables do
 
     create table(:device_transactions, primary_key: false) do
       add :txn_id, :string, primary_key: true, null: false
-      add :device_nid, references(:devices, column: :nid, on_delete: :delete_all), primary_key: true
+
+      add :device_nid, references(:devices, column: :nid, on_delete: :delete_all),
+        primary_key: true
+
       add :event_id, :string, null: false
     end
   end

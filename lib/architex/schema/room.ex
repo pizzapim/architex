@@ -5,7 +5,7 @@ defmodule Architex.Room do
   import Ecto.Query
 
   alias Architex.{Repo, Room, Event, Alias, RoomServer}
-  alias ArchitexWeb.Client.Request.CreateRoom
+  alias ArchitexWeb.Client.Request.{CreateRoom, Messages}
 
   @type t :: %__MODULE__{
           visibility: :public | :private,
@@ -22,10 +22,12 @@ defmodule Architex.Room do
     has_many :aliases, Alias, foreign_key: :room_id
   end
 
+  @spec changeset(Room.t(), map()) :: Ecto.Changeset.t()
   def changeset(room, params \\ %{}) do
     cast(room, params, [:visibility])
   end
 
+  @spec create_changeset(CreateRoom.t()) :: Ecto.Changeset.t()
   def create_changeset(%CreateRoom{visibility: visibility}) do
     visibility = visibility || :public
 
@@ -33,10 +35,12 @@ defmodule Architex.Room do
     |> changeset(%{visibility: visibility})
   end
 
+  @spec generate_room_id() :: String.t()
   def generate_room_id do
     "!" <> Architex.random_string(18) <> ":" <> Architex.server_name()
   end
 
+  @spec update_forward_extremities(Event.t(), Room.t()) :: Room.t()
   def update_forward_extremities(
         %Event{
           id: event_id,
@@ -54,6 +58,7 @@ defmodule Architex.Room do
     room
   end
 
+  @spec create(Account.t(), CreateRoom.t()) :: {:ok, String.t()} | {:error, atom()}
   def create(account, input) do
     with {:ok, %Room{id: room_id}} <- Repo.insert(create_changeset(input)),
          {:ok, pid} <- RoomServer.get_room_server(room_id) do
@@ -61,5 +66,64 @@ defmodule Architex.Room do
     else
       _ -> {:error, :unknown}
     end
+  end
+
+  def get_messages(room, %Messages{from: from, to: to, dir: dir, limit: limit}) do
+    # TODO: Quaternion seems to show events in the wrong order?
+    # TODO: Check 'from' and 'to' formats.
+    limit = limit || 10
+
+    events =
+      room
+      |> Ecto.assoc(:events)
+      |> order_by_direction(dir)
+      |> events_from(from, dir)
+      |> events_to(to, dir)
+      |> limit(^limit)
+      |> Repo.all()
+
+    {events, get_start(events), get_end(events, limit)}
+  end
+
+  defp order_by_direction(query, "b"), do: order_by(query, desc: :origin_server_ts, desc: :nid)
+  defp order_by_direction(query, "f"), do: order_by(query, asc: :origin_server_ts, asc: :nid)
+
+  # When 'from' is empty, we return events from the start or end
+  # of the room's history.
+  defp events_from(query, "", _), do: query
+
+  defp events_from(query, from, "b") do
+    from = String.to_integer(from)
+    where(query, [e], e.nid < ^from)
+  end
+
+  defp events_from(query, from, "f") do
+    from = String.to_integer(from)
+    where(query, [e], e.nid > ^from)
+  end
+
+  defp events_to(query, nil, _), do: query
+
+  defp events_to(query, to, "b") do
+    to = String.to_integer(to)
+    where(query, [e], e.nid >= ^to)
+  end
+
+  defp events_to(query, to, "f") do
+    to = String.to_integer(to)
+    where(query, [e], e.nid <= ^to)
+  end
+
+  defp get_start([]), do: nil
+
+  defp get_start([%Event{nid: first_nid} | _]) do
+    Integer.to_string(first_nid)
+  end
+
+  defp get_end(events, limit) when length(events) < limit, do: nil
+
+  defp get_end(events, _) do
+    %Event{nid: last_nid} = List.last(events)
+    Integer.to_string(last_nid)
   end
 end

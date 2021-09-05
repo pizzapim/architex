@@ -6,7 +6,7 @@ defmodule ArchitexWeb.Error do
     bad_json: {400, "M_BAD_JSON", "Bad request."},
     user_in_use: {400, "M_USER_IN_USE", "Username is already taken."},
     invalid_username: {400, "M_INVALID_USERNAME", "Invalid username."},
-    forbidden: {400, "M_FORBIDDEN", "The requested action is forbidden."},
+    forbidden: {403, "M_FORBIDDEN", "The requested action is forbidden."},
     unrecognized: {400, "M_UNRECOGNIZED", "Unrecognized request."},
     unknown: {400, "M_UNKNOWN", "An unknown error occurred."},
     invalid_room_state:

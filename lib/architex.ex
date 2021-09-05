@@ -271,4 +271,15 @@ defmodule Architex do
       end
     end
   end
+
+  # https://stackoverflow.com/a/45754361
+  def validate_not_nil(changeset, fields) do
+    Enum.reduce(fields, changeset, fn field, changeset ->
+      if Ecto.Changeset.get_field(changeset, field) == nil do
+        Ecto.Changeset.add_error(changeset, field, "nil")
+      else
+        changeset
+      end
+    end)
+  end
 end
