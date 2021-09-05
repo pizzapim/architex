@@ -229,11 +229,7 @@ defmodule ArchitexWeb.Client.RoomController do
     end
   end
 
-  # GET /_matrix/client/r0/rooms/!atYDsyowueiToUvuqY:localhost:4000/messages
-  # Parameters: %{"dir" => "b", "from" => "", "limit" => "727", "path" => ["_matrix", "client", "r0", "rooms", "!atYDsyowueiToUvuqY:localhost:4000", "messages"]}
   def messages(%Conn{assigns: %{account: account}} = conn, %{"room_id" => room_id} = params) do
-    # IO.inspect(Messages.changeset(%Messages{}, params))
-
     with {:ok, request} <- Messages.parse(params) do
       room_query =
         account

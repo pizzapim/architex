@@ -40,7 +40,7 @@ defmodule ArchitexWeb.LoginControllerTest do
     test "handles unknown matrix user id", %{conn: conn} do
       conn = post_json(conn, Routes.login_path(Endpoint, :login), @basic_params)
 
-      assert %{"errcode" => "M_FORBIDDEN"} = json_response(conn, 400)
+      assert %{"errcode" => "M_FORBIDDEN"} = json_response(conn, 403)
     end
 
     test "handles wrong password", %{conn: conn} do
@@ -48,7 +48,7 @@ defmodule ArchitexWeb.LoginControllerTest do
 
       conn = post_json(conn, Routes.login_path(Endpoint, :login), @basic_params)
 
-      assert %{"errcode" => "M_FORBIDDEN"} = json_response(conn, 400)
+      assert %{"errcode" => "M_FORBIDDEN"} = json_response(conn, 403)
     end
 
     # TODO: Test display name

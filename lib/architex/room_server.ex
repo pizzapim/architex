@@ -398,7 +398,7 @@ defmodule Architex.RoomServer do
     end
   end
 
-  @spec insert_single_event(Room.t(), t(), Event.t()) ::
+  @spec insert_single_event(Room.t(), t(), %Event{}) ::
           (() -> {t(), Room.t(), Event.t()} | {:error, atom()})
   defp insert_single_event(room, state_set, event) do
     fn ->
@@ -472,7 +472,7 @@ defmodule Architex.RoomServer do
   # Get the events for room creation as dictated by the given preset.
   # TODO: trusted_private_chat:
   #       All invitees are given the same power level as the room creator.
-  @spec room_creation_preset(Account.t(), String.t() | nil, Room.t()) :: [Event.t()]
+  @spec room_creation_preset(Account.t(), String.t() | nil, Room.t()) :: [%Event{}]
   defp room_creation_preset(account, nil, %Room{visibility: visibility} = room) do
     preset =
       case visibility do
@@ -505,7 +505,7 @@ defmodule Architex.RoomServer do
   # - Content hash
   # - Event ID
   # - Signature
-  @spec finalize_and_insert_event(Event.t(), t(), Room.t()) ::
+  @spec finalize_and_insert_event(%Event{}, t(), Room.t()) ::
           {:ok, t(), Room.t(), Event.t()} | {:error, atom()}
   defp finalize_and_insert_event(
          event,
@@ -516,6 +516,7 @@ defmodule Architex.RoomServer do
       event
       |> Map.put(:auth_events, auth_events_for_event(event, state_set))
       |> Map.put(:prev_events, forward_extremities)
+      |> Map.put(:depth, get_depth(forward_extremities))
 
     case Event.post_process(event) do
       {:ok, event} -> authenticate_and_insert_event(event, state_set, room)
@@ -523,8 +524,17 @@ defmodule Architex.RoomServer do
     end
   end
 
+  @spec get_depth([String.t()]) :: integer()
+  defp get_depth(prev_event_ids) do
+    Event
+    |> where([e], e.id in ^prev_event_ids)
+    |> select([e], e.depth)
+    |> Repo.all()
+    |> Enum.max(fn -> 0 end)
+  end
+
   # Get the auth events for an events.
-  @spec auth_events_for_event(Event.t(), t()) :: [{String.t(), String.t()}]
+  @spec auth_events_for_event(%Event{}, t()) :: [Event.t()]
   defp auth_events_for_event(%Event{type: "m.room.create"}, _), do: []
 
   defp auth_events_for_event(

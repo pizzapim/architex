@@ -4,7 +4,7 @@ defmodule Architex.Room do
   import Ecto.Changeset
   import Ecto.Query
 
-  alias Architex.{Repo, Room, Event, Alias, RoomServer}
+  alias Architex.{Repo, Room, Event, Alias, RoomServer, Account}
   alias ArchitexWeb.Client.Request.{CreateRoom, Messages}
 
   @type t :: %__MODULE__{
@@ -22,7 +22,7 @@ defmodule Architex.Room do
     has_many :aliases, Alias, foreign_key: :room_id
   end
 
-  @spec changeset(Room.t(), map()) :: Ecto.Changeset.t()
+  @spec changeset(%Room{}, map()) :: Ecto.Changeset.t()
   def changeset(room, params \\ %{}) do
     cast(room, params, [:visibility])
   end

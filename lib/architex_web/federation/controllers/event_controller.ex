@@ -90,16 +90,23 @@ defmodule ArchitexWeb.Federation.EventController do
         case RoomServer.get_room_server(room) do
           {:ok, pid} ->
             if RoomServer.server_in_room?(pid, origin) do
-              {state_events, auth_chain} =
+              # {state_events, auth_chain} =
+              data =
                 case state_or_state_ids do
-                  :state -> RoomServer.get_state_at_event(pid, event)
-                  :state_ids -> RoomServer.get_state_ids_at_event(pid, event)
-                end
+                  :state ->
+                    {state_events, auth_chain} = RoomServer.get_state_at_event(pid, event)
 
-              data = %{
-                auth_chain: auth_chain,
-                pdus: state_events
-              }
+                    %{
+                      auth_chain: Enum.map(auth_chain, &Architex.Event.Formatters.as_pdu/1),
+                      pdus: Enum.map(state_events, &Architex.Event.Formatters.as_pdu/1)
+                    }
+
+                  :state_ids ->
+                    {state_event_ids, auth_chain_ids} =
+                      RoomServer.get_state_ids_at_event(pid, event)
+
+                    %{auth_chain: auth_chain_ids, pdus: state_event_ids}
+                end
 
               conn
               |> put_status(200)

@@ -6,76 +6,58 @@ defmodule Architex.Event do
   alias Architex.{Repo, Room, Event, Account, EncodableMap, KeyServer}
   alias Architex.Types.UserId
 
-  # TODO: It seems unsigned is always set, even though it is not specified?
+  # TODO: It seems unsigned is always set in DB, even though it is not specified?
   @type t :: %__MODULE__{
-          type: String.t(),
-          origin_server_ts: integer(),
-          state_key: String.t() | nil,
-          sender: UserId.t(),
-          content: map(),
-          prev_events: [String.t()] | nil,
+          nid: integer(),
+          id: String.t(),
           auth_events: [String.t()],
-          unsigned: map() | nil,
-          signatures: map() | nil,
-          hashes: map() | nil
+          content: map(),
+          depth: integer(),
+          hashes: map(),
+          origin: String.t(),
+          origin_server_ts: integer(),
+          prev_events: [String.t()],
+          redacts: String.t() | nil,
+          room_id: String.t(),
+          sender: UserId.t(),
+          signatures: map(),
+          state_key: String.t() | nil,
+          type: String.t(),
+          unsigned: map() | nil
         }
 
-  @primary_key {:nid, :id, autogenerate: true}
+  @primary_key false
   schema "events" do
-    field :type, :string
-    field :origin_server_ts, :integer
-    field :state_key, :string
-    field :sender, UserId
-    field :content, :map
-    field :prev_events, {:array, :string}
-    field :auth_events, {:array, :string}
-    field :unsigned, :map
-    field :signatures, {:map, {:map, :string}}
-    field :hashes, {:map, :string}
+    field :nid, :id, primary_key: true, autogenerate: true
     field :id, :string
 
+    # PDU fields
+    field :auth_events, {:array, :string}
+    field :content, :map
+    field :depth, :integer
+    field :hashes, {:map, :string}
+    field :origin, :string
+    field :origin_server_ts, :integer
+    field :prev_events, {:array, :string}
+    field :redacts, :string
     belongs_to :room, Room, type: :string
+    field :sender, UserId
+    field :signatures, {:map, {:map, :string}}
+    field :state_key, :string
+    field :type, :string
+    field :unsigned, :map
   end
 
-  # TODO: Move this to a dedicated function in Event.Formatters.
-  defimpl Jason.Encoder, for: Event do
-    @pdu_keys [
-      :auth_events,
-      :content,
-      :depth,
-      :hashes,
-      :origin,
-      :origin_server_ts,
-      :prev_events,
-      :redacts,
-      :room_id,
-      :sender,
-      :signatures,
-      :state_key,
-      :type,
-      :unsigned
-    ]
-
-    def encode(event, opts) do
-      event
-      |> Map.take(@pdu_keys)
-      |> Map.update!(:sender, &Kernel.to_string/1)
-      |> Jason.Encode.map(opts)
-    end
-  end
-
-  @spec new(Room.t(), Account.t()) :: %Event{}
   def new(%Room{id: room_id}, %Account{localpart: localpart}) do
     %Event{
       room_id: room_id,
       sender: %UserId{localpart: localpart, domain: Architex.server_name()},
       origin_server_ts: DateTime.utc_now() |> DateTime.to_unix(:millisecond),
-      prev_events: [],
-      auth_events: []
+      origin: Architex.server_name()
     }
   end
 
-  @spec custom_message(Room.t(), Account.t(), String.t(), map()) :: t()
+  @spec custom_message(Room.t(), Account.t(), String.t(), map()) :: %Event{}
   def custom_message(room, sender, type, content) do
     %Event{
       Event.new(room, sender)
@@ -224,7 +206,7 @@ defmodule Architex.Event do
   defp calculate_content_hash(event) do
     m =
       event
-      |> Architex.to_serializable_map()
+      |> Architex.Event.Formatters.as_pdu()
       |> Map.drop([:unsigned, :signature, :hashes])
       |> EncodableMap.from_map()
 
@@ -233,11 +215,10 @@ defmodule Architex.Event do
     end
   end
 
-  @spec redact(t()) :: map()
   defp redact(%Event{type: type, content: content} = event) do
     redacted_event =
       event
-      |> Architex.to_serializable_map()
+      |> Architex.Event.Formatters.as_pdu()
       |> Map.take([
         :id,
         :type,

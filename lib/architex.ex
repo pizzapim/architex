@@ -155,16 +155,6 @@ defmodule Architex do
   end
 
   @doc """
-  Serialize and encode the given struct.
-  """
-  @spec serialize_and_encode(struct()) :: {:ok, String.t()} | {:error, Jason.EncodeError.t()}
-  def serialize_and_encode(struct) do
-    struct
-    |> to_serializable_map()
-    |> encode_canonical_json()
-  end
-
-  @doc """
   Add a signature to the given map under the `:signatures` key.
 
   If the map has no `:signatures` key, it is created.

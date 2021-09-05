@@ -1,7 +1,7 @@
 defmodule Architex.Event.Join do
   alias Architex.{Event, Account, Room}
 
-  @spec new(Room.t(), Account.t()) :: Event.t()
+  @spec new(Room.t(), Account.t()) :: %Event{}
   def new(room, %Account{localpart: localpart} = sender) do
     mxid = Architex.get_mxid(localpart)
 
@@ -19,7 +19,7 @@ end
 defmodule Architex.Event.CreateRoom do
   alias Architex.{Event, Account, Room}
 
-  @spec new(Room.t(), Account.t(), String.t()) :: Event.t()
+  @spec new(Room.t(), Account.t(), String.t()) :: %Event{}
   def new(room, %Account{localpart: localpart} = creator, room_version) do
     mxid = Architex.get_mxid(localpart)
 
@@ -38,7 +38,7 @@ end
 defmodule Architex.Event.PowerLevels do
   alias Architex.{Event, Account, Room}
 
-  @spec new(Room.t(), Account.t()) :: Event.t()
+  @spec new(Room.t(), Account.t()) :: %Event{}
   def new(room, %Account{localpart: localpart} = sender) do
     mxid = Architex.get_mxid(localpart)
 
@@ -69,7 +69,7 @@ end
 defmodule Architex.Event.Name do
   alias Architex.{Event, Account, Room}
 
-  @spec new(Room.t(), Account.t(), String.t()) :: Event.t()
+  @spec new(Room.t(), Account.t(), String.t()) :: %Event{}
   def new(room, sender, name) do
     %Event{
       Event.new(room, sender)
@@ -85,7 +85,7 @@ end
 defmodule Architex.Event.Topic do
   alias Architex.{Event, Account, Room}
 
-  @spec new(Room.t(), Account.t(), String.t()) :: Event.t()
+  @spec new(Room.t(), Account.t(), String.t()) :: %Event{}
   def new(room, sender, topic) do
     %Event{
       Event.new(room, sender)
@@ -101,7 +101,7 @@ end
 defmodule Architex.Event.JoinRules do
   alias Architex.{Event, Account, Room}
 
-  @spec new(Room.t(), Account.t(), String.t()) :: Event.t()
+  @spec new(Room.t(), Account.t(), String.t()) :: %Event{}
   def new(room, sender, join_rule) do
     %Event{
       Event.new(room, sender)
@@ -117,7 +117,7 @@ end
 defmodule Architex.Event.HistoryVisibility do
   alias Architex.{Event, Account, Room}
 
-  @spec new(Room.t(), Account.t(), String.t()) :: Event.t()
+  @spec new(Room.t(), Account.t(), String.t()) :: %Event{}
   def new(room, sender, history_visibility) do
     %Event{
       Event.new(room, sender)
@@ -133,7 +133,7 @@ end
 defmodule Architex.Event.GuestAccess do
   alias Architex.{Event, Account, Room}
 
-  @spec new(Room.t(), Account.t(), String.t()) :: Event.t()
+  @spec new(Room.t(), Account.t(), String.t()) :: %Event{}
   def new(room, sender, guest_access) do
     %Event{
       Event.new(room, sender)
@@ -149,7 +149,7 @@ end
 defmodule Architex.Event.Invite do
   alias Architex.{Event, Account, Room}
 
-  @spec new(Room.t(), Account.t(), String.t()) :: Event.t()
+  @spec new(Room.t(), Account.t(), String.t()) :: %Event{}
   def new(room, sender, user_id) do
     %Event{
       Event.new(room, sender)
@@ -165,7 +165,7 @@ end
 defmodule Architex.Event.Leave do
   alias Architex.{Event, Account, Room}
 
-  @spec new(Room.t(), Account.t()) :: Event.t()
+  @spec new(Room.t(), Account.t()) :: %Event{}
   def new(room, sender) do
     %Event{
       Event.new(room, sender)
@@ -181,7 +181,7 @@ end
 defmodule Architex.Event.Kick do
   alias Architex.{Event, Account, Room}
 
-  @spec new(Room.t(), Account.t(), String.t(), String.t() | nil) :: Event.t()
+  @spec new(Room.t(), Account.t(), String.t(), String.t() | nil) :: %Event{}
   def new(room, sender, user_id, reason \\ nil) do
     content = %{"membership" => "leave"}
     content = if reason, do: Map.put(content, "reason", reason), else: content
@@ -198,7 +198,7 @@ end
 defmodule Architex.Event.Ban do
   alias Architex.{Event, Account, Room}
 
-  @spec new(Room.t(), Account.t(), String.t(), String.t() | nil) :: Event.t()
+  @spec new(Room.t(), Account.t(), String.t(), String.t() | nil) :: %Event{}
   def new(room, sender, user_id, reason \\ nil) do
     content = %{"membership" => "ban"}
     content = if reason, do: Map.put(content, "reason", reason), else: content
@@ -214,7 +214,7 @@ end
 
 defmodule Architex.Event.Unban do
   alias Architex.{Event, Account, Room}
-  @spec new(Room.t(), Account.t(), String.t()) :: Event.t()
+  @spec new(Room.t(), Account.t(), String.t()) :: %Event{}
   def new(room, sender, user_id) do
     %Event{
       Event.new(room, sender)

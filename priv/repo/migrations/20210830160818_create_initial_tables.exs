@@ -27,19 +27,23 @@ defmodule Architex.Repo.Migrations.CreateInitialTables do
 
     create table(:events, primary_key: false) do
       add :nid, :serial, primary_key: true
-
-      add :origin_server_ts, :bigint, null: false
-      add :unsigned, :map, default: %{}, null: true
-      add :hashes, :map, null: false
-      add :signatures, :map, null: false
       add :id, :string, null: false
-      add :content, :map
-      add :type, :string, null: false
-      add :state_key, :string
-      add :sender, :string, null: false
-      add :prev_events, {:array, :string}, null: false
+
+      # PDU Fields
       add :auth_events, {:array, :string}, null: false
+      add :content, :map, null: false
+      add :depth, :integer, null: false
+      add :hashes, :map, null: false
+      add :origin, :string, null: false
+      add :origin_server_ts, :bigint, null: false
+      add :prev_events, {:array, :string}, null: false
+      add :redacts, :string, null: true
       add :room_id, references(:rooms, type: :string), null: false
+      add :sender, :string, null: false
+      add :signatures, :map, null: false
+      add :state_key, :string, null: true
+      add :type, :string, null: false
+      add :unsigned, :map, default: %{}, null: true
     end
 
     create index(:events, [:id], unique: true)

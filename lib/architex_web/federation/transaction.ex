@@ -8,7 +8,7 @@ defmodule ArchitexWeb.Federation.Transaction do
   @type t :: %__MODULE__{
           origin: String.t(),
           origin_server_ts: integer(),
-          pdus: [Event.t()],
+          pdus: [map()],
           edus: [edu()] | nil
         }
 
@@ -29,7 +29,7 @@ defmodule ArchitexWeb.Federation.Transaction do
     %Transaction{
       origin: Architex.server_name(),
       origin_server_ts: System.os_time(:millisecond),
-      pdus: Enum.map(pdu_events, &Architex.to_serializable_map/1),
+      pdus: Enum.map(pdu_events, &Architex.Event.Formatters.as_pdu/1),
       edus: edus
     }
   end

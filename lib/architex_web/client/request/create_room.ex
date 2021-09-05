@@ -6,13 +6,13 @@ defmodule ArchitexWeb.Client.Request.CreateRoom do
   alias Ecto.Changeset
 
   @type t :: %__MODULE__{
-          visibility: String.t(),
-          room_alias_name: String.t(),
-          name: String.t(),
-          topic: String.t(),
-          invite: list(String.t()),
-          room_version: String.t(),
-          preset: String.t()
+          visibility: String.t() | nil,
+          room_alias_name: String.t() | nil,
+          name: String.t() | nil,
+          topic: String.t() | nil,
+          invite: list(String.t()) | nil,
+          room_version: String.t() | nil,
+          preset: String.t() | nil
         }
 
   @primary_key false
