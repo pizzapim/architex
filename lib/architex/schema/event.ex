@@ -6,7 +6,6 @@ defmodule Architex.Event do
   alias Architex.{Repo, Room, Event, Account, EncodableMap, KeyServer}
   alias Architex.Types.UserId
 
-  # TODO: It seems unsigned is always set in DB, even though it is not specified?
   @type t :: %__MODULE__{
           nid: integer(),
           id: String.t(),

@@ -43,7 +43,7 @@ defmodule Architex.Repo.Migrations.CreateInitialTables do
       add :signatures, :map, null: false
       add :state_key, :string, null: true
       add :type, :string, null: false
-      add :unsigned, :map, default: %{}, null: true
+      add :unsigned, :map, null: true
     end
 
     create index(:events, [:id], unique: true)
