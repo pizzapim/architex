@@ -17,5 +17,7 @@ defmodule ArchitexWeb.Client.Request.Messages do
     |> Architex.validate_not_nil([:from])
     |> validate_inclusion(:dir, ["b", "f"])
     |> validate_number(:limit, greater_than: 0)
+    |> validate_format(:from, ~r/^[0-9]*$/)
+    |> validate_format(:to, ~r/^[0-9]+$/)
   end
 end

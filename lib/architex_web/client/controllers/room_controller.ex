@@ -241,8 +241,8 @@ defmodule ArchitexWeb.Client.RoomController do
           {events, start, end_} = Room.get_messages(room, request)
           events = Enum.map(events, &Event.Formatters.for_client/1)
           data = %{chunk: events}
-          data = if start, do: Map.put(data, :start, start), else: data
-          data = if end_, do: Map.put(data, :end, end_), else: data
+          data = if start, do: Map.put(data, :start, Integer.to_string(start)), else: data
+          data = if end_, do: Map.put(data, :end, Integer.to_string(end_)), else: data
 
           conn
           |> put_status(200)
