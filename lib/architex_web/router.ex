@@ -53,6 +53,7 @@ defmodule ArchitexWeb.Router do
       post "/logout/all", AccountController, :logout_all
       post "/createRoom", RoomController, :create
       get "/joined_rooms", RoomController, :joined_rooms
+      get "/capabilities", InfoController, :capabilities
 
       scope "/directory" do
         put "/room/:alias", AliasesController, :create
