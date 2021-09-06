@@ -55,6 +55,7 @@ Here, implemented and some unimplemented features are listed.
 - GET /_matrix/client/r0/rooms/{roomId}/messages: Except filtering.
 - GET /_matrix/client/r0/directory/list/room/{roomId}
 - PUT /_matrix/client/r0/directory/list/room/{roomId}
+- GET /_matrix/client/r0/capabilities
 
 #### Federation API
 
