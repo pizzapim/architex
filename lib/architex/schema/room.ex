@@ -82,7 +82,7 @@ defmodule Architex.Room do
       |> limit(^limit)
       |> Repo.all()
 
-    {events, get_start(events), get_end(events, limit)}
+    {events, get_start(events, dir), get_end(events, limit, dir)}
   end
 
   defp order_by_direction(query, "b"), do: order_by(query, desc: :origin_server_ts, desc: :nid)
@@ -114,15 +114,24 @@ defmodule Architex.Room do
     where(query, [e], e.nid <= ^to)
   end
 
-  defp get_start([]), do: nil
+  defp get_start([], _), do: nil
 
-  defp get_start([%Event{nid: first_nid} | _]) do
+  defp get_start([%Event{nid: first_nid} | _], "f") do
     Integer.to_string(first_nid)
   end
 
-  defp get_end(events, limit) when length(events) < limit, do: nil
+  defp get_start(events, "b") do
+    %Event{nid: last_nid} = List.last(events)
+    Integer.to_string(last_nid)
+  end
 
-  defp get_end(events, _) do
+  defp get_end(events, limit, _) when length(events) < limit, do: nil
+
+  defp get_end([%Event{nid: first_nid} | _], _, "f") do
+    Integer.to_string(first_nid)
+  end
+
+  defp get_end(events, _, "b") do
     %Event{nid: last_nid} = List.last(events)
     Integer.to_string(last_nid)
   end

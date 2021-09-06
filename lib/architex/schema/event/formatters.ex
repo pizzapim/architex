@@ -12,7 +12,8 @@ defmodule Architex.Event.Formatters do
         sender: sender,
         origin_server_ts: origin_server_ts,
         unsigned: unsigned,
-        room_id: room_id
+        room_id: room_id,
+        state_key: state_key
       }) do
     data = %{
       content: content,
@@ -24,6 +25,7 @@ defmodule Architex.Event.Formatters do
     }
 
     data = if unsigned, do: Map.put(data, :unsigned, unsigned), else: data
+    data = if state_key, do: Map.put(data, :state_key, state_key), else: data
 
     data
   end
