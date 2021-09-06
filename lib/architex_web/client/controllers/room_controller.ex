@@ -204,6 +204,11 @@ defmodule ArchitexWeb.Client.RoomController do
 
   def unban(conn, _), do: put_error(conn, :missing_param)
 
+  @doc """
+  This endpoint is used to send a message event to a room.
+
+  Action for PUT /_matrix/client/r0/rooms/{roomId}/send/{eventType}/{txnId}.
+  """
   def send_message(
         %Conn{assigns: %{account: account, device: device}, body_params: body_params} = conn,
         %{
@@ -229,6 +234,11 @@ defmodule ArchitexWeb.Client.RoomController do
     end
   end
 
+  @doc """
+  This API returns a list of message and state events for a room.
+
+  Action for GET /_matrix/client/r0/rooms/{roomId}/messages.
+  """
   def messages(%Conn{assigns: %{account: account}} = conn, %{"room_id" => room_id} = params) do
     with {:ok, request} <- Messages.parse(params) do
       room_query =

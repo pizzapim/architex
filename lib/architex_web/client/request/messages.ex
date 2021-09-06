@@ -1,6 +1,14 @@
 defmodule ArchitexWeb.Client.Request.Messages do
   use ArchitexWeb.Request
 
+  @type t :: %__MODULE__{
+    from: String.t(),
+    to: String.t() | nil,
+    dir: String.t(),
+    limit: integer() | nil,
+    filter: String.t() | nil
+  }
+
   @primary_key false
   embedded_schema do
     field :from, :string

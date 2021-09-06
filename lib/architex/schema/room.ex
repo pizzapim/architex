@@ -68,8 +68,8 @@ defmodule Architex.Room do
     end
   end
 
+  @spec get_messages(Room.t(), Messages.t()) :: {[Event.t()], integer() | nil, integer() | nil}
   def get_messages(room, %Messages{from: from, to: to, dir: dir, limit: limit}) do
-    # TODO: Check 'from' and 'to' formats.
     limit = limit || 10
 
     events =
@@ -84,11 +84,13 @@ defmodule Architex.Room do
     {events, get_start(events, dir), get_end(events, limit, dir)}
   end
 
+  @spec order_by_direction(Ecto.Query.t(), String.t()) :: Ecto.Query.t()
   defp order_by_direction(query, "b"), do: order_by(query, desc: :origin_server_ts, desc: :nid)
   defp order_by_direction(query, "f"), do: order_by(query, asc: :origin_server_ts, asc: :nid)
 
   # When 'from' is empty, we return events from the start or end
   # of the room's history.
+  @spec events_from(Ecto.Query.t(), String.t(), String.t()) :: Ecto.Query.t()
   defp events_from(query, "", _), do: query
 
   defp events_from(query, from, "b") do
@@ -101,6 +103,7 @@ defmodule Architex.Room do
     where(query, [e], e.nid > ^from)
   end
 
+  @spec events_to(Ecto.Query.t(), String.t() | nil, String.t()) :: Ecto.Query.t()
   defp events_to(query, nil, _), do: query
 
   defp events_to(query, to, "b") do
@@ -113,8 +116,8 @@ defmodule Architex.Room do
     where(query, [e], e.nid <= ^to)
   end
 
+  @spec get_start([Event.t()], String.t()) :: integer() | nil
   defp get_start([], _), do: nil
-
   defp get_start([%Event{nid: first_nid} | _], "f"), do: first_nid
 
   defp get_start(events, "b") do
@@ -122,6 +125,7 @@ defmodule Architex.Room do
     last_nid
   end
 
+  @spec get_end([Event.t()], integer(), String.t()) :: integer() | nil
   defp get_end(events, limit, _) when length(events) < limit, do: nil
 
   defp get_end([%Event{nid: first_nid} | _], _, "f"), do: first_nid
