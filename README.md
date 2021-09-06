@@ -23,14 +23,46 @@ Generate the server's ed25519 keys by executing `ssh-keygen -t ed25519 -f keys/i
 
 Here, implemented and some unimplemented features are listed.
 
-TODO: list implemented endpoints
-
-### Implemented
+### Implemented features
 
 * State resolution: functional, but very memory-intensive and with high database usage. For now it is sufficient, but snapshots should be used in the future. See: [State Resolution v2 for the Hopelessly Unmathematical](https://matrix.org/docs/guides/implementing-stateres), [State Resolution: Reloaded](https://matrix.uhoreg.ca/stateres/reloaded.html) and [Room Version 2](https://spec.matrix.org/unstable/rooms/v2).
 * Authorization rules ([Room version 1](https://spec.matrix.org/unstable/rooms/v1/))
 * Homeserver authentication using signing keys ([4.1 Request Authentication](https://matrix.org/docs/spec/server_server/latest#request-authentication))
 * Client authentication ([5.1 Using access tokens](https://matrix.org/docs/spec/client_server/r0.6.1#using-access-tokens))
+
+### Implemented API endpoints
+
+#### Client-Server API
+
+- GET /_matrix/client/r0/register/available
+- GET /_matrix/client/r0/account/whoami
+- POST /_matrix/client/r0/logout
+- POST /_matrix/client/r0/logout/all
+- PUT /_matrix/client/r0/directory/room/{roomAlias}
+- GET /_matrix/client/versions
+- GET /_matrix/client/r0/login
+- POST /_matrix/client/r0/login: Only with password flow.
+- POST /_matrix/client/r0/register: Only with dummy flow.
+- POST /_matrix/client/r0/createRoom: Only with optional parameters name, topic and preset.
+- GET /_matrix/client/r0/joined_rooms
+- POST /_matrix/client/r0/rooms/{roomId}/invite
+- POST /_matrix/client/r0/rooms/{roomId}/join: Except with third party invite.
+- POST /_matrix/client/r0/rooms/{roomId}/leave
+- POST /_matrix/client/r0/rooms/{roomId}/kick
+- POST /_matrix/client/r0/rooms/{roomId}/ban
+- POST /_matrix/client/r0/rooms/{roomId}/unban
+- PUT /_matrix/client/r0/rooms/{roomId}/send/{eventType}/{txnId}
+- GET /_matrix/client/r0/rooms/{roomId}/messages: Except filtering.
+- GET /_matrix/client/r0/directory/list/room/{roomId}
+- PUT /_matrix/client/r0/directory/list/room/{roomId}
+
+#### Federation API
+
+- GET /_matrix/federation/v1/event/{eventId}
+- GET /_matrix/federation/v1/state/{roomId}
+- GET /_matrix/federation/v1/state_ids/{roomId}
+- GET /_matrix/key/v2/server/{keyId}
+- GET /_matrix/federation/v1/query/profile: Except displayname and avatar_url is not implemented.
 
 ### Major unimplemented features
 
