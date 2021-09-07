@@ -54,6 +54,7 @@ defmodule ArchitexWeb.Router do
       post "/createRoom", RoomController, :create
       get "/joined_rooms", RoomController, :joined_rooms
       get "/capabilities", InfoController, :capabilities
+      get "/sync", SyncController, :sync
 
       scope "/directory" do
         put "/room/:alias", AliasesController, :create

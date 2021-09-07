@@ -249,7 +249,7 @@ defmodule ArchitexWeb.Client.RoomController do
       case Repo.one(room_query) do
         %Room{} = room ->
           {events, start, end_} = Room.get_messages(room, request)
-          events = Enum.map(events, &Event.Formatters.for_client/1)
+          events = Enum.map(events, &Event.Formatters.messages_response/1)
           data = %{chunk: events}
           data = if start, do: Map.put(data, :start, Integer.to_string(start)), else: data
           data = if end_, do: Map.put(data, :end, Integer.to_string(end_)), else: data

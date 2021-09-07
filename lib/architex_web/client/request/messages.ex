@@ -2,19 +2,19 @@ defmodule ArchitexWeb.Client.Request.Messages do
   use ArchitexWeb.Request
 
   @type t :: %__MODULE__{
-    from: String.t(),
-    to: String.t() | nil,
-    dir: String.t(),
-    limit: integer() | nil,
-    filter: String.t() | nil
-  }
+          from: String.t(),
+          to: String.t() | nil,
+          dir: String.t(),
+          limit: integer() | nil,
+          filter: String.t() | nil
+        }
 
   @primary_key false
   embedded_schema do
     field :from, :string
     field :to, :string
     field :dir, :string
-    field :limit, :integer
+    field :limit, :integer, default: 10
     field :filter, :string
   end
 

@@ -4,8 +4,8 @@ defmodule Architex.Event.Formatters do
   """
   alias Architex.Event
 
-  @spec for_client(Event.t()) :: map()
-  def for_client(%Event{
+  @spec messages_response(Event.t()) :: map()
+  def messages_response(%Event{
         content: content,
         type: type,
         id: event_id,
@@ -26,6 +26,27 @@ defmodule Architex.Event.Formatters do
 
     data = if unsigned, do: Map.put(data, :unsigned, unsigned), else: data
     data = if state_key, do: Map.put(data, :state_key, state_key), else: data
+
+    data
+  end
+
+  def sync_response(%Event{
+        content: content,
+        type: type,
+        id: event_id,
+        sender: sender,
+        origin_server_ts: origin_server_ts,
+        unsigned: unsigned
+      }) do
+    data = %{
+      content: content,
+      type: type,
+      event_id: event_id,
+      sender: to_string(sender),
+      origin_server_ts: origin_server_ts
+    }
+
+    data = if unsigned, do: Map.put(data, :unsigned, unsigned), else: data
 
     data
   end

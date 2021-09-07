@@ -70,8 +70,6 @@ defmodule Architex.Room do
 
   @spec get_messages(Room.t(), Messages.t()) :: {[Event.t()], integer() | nil, integer() | nil}
   def get_messages(room, %Messages{from: from, to: to, dir: dir, limit: limit}) do
-    limit = limit || 10
-
     events =
       room
       |> Ecto.assoc(:events)
@@ -90,6 +88,8 @@ defmodule Architex.Room do
 
   # When 'from' is empty, we return events from the start or end
   # of the room's history.
+  # TODO: Might actually not be needed, could be that Quaternion is passing
+  # an empty string because the /sync call fails.
   @spec events_from(Ecto.Query.t(), String.t(), String.t()) :: Ecto.Query.t()
   defp events_from(query, "", _), do: query
 
