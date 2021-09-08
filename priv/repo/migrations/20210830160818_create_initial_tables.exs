@@ -91,5 +91,11 @@ defmodule Architex.Repo.Migrations.CreateInitialTables do
 
       add :event_id, :string, null: false
     end
+
+    create table(:membership, primary_key: false) do
+      add :account_id, references(:accounts), primary_key: true
+      add :room_id, references(:rooms, type: :string), primary_key: true
+      add :membership, :string, null: false
+    end
   end
 end

@@ -47,11 +47,12 @@ defmodule ArchitexWeb.Client.SyncController do
         {room_id, joined_room}
       end)
 
-    next_batch = Enum.map(events_per_room, fn {_, events} ->
-      %Event{nid: last_nid} = List.last(events)
-      last_nid
-    end)
-    |> Enum.max(fn -> 0 end)
+    next_batch =
+      Enum.map(events_per_room, fn {_, events} ->
+        %Event{nid: last_nid} = List.last(events)
+        last_nid
+      end)
+      |> Enum.max(fn -> 0 end)
 
     data = %{
       next_batch: Integer.to_string(next_batch),

@@ -21,7 +21,8 @@ defmodule Architex.RoomServer do
     Account,
     JoinedRoom,
     Device,
-    DeviceTransaction
+    DeviceTransaction,
+    Membership
   }
 
   alias Architex.StateResolution.Authorization
@@ -607,6 +608,7 @@ defmodule Architex.RoomServer do
       state_set = StateResolution.resolve_forward_extremities(event)
       # TODO: Do this as a background job, and not after every insert...
       _ = update_joined_rooms(room, state_set)
+      :ok = update_membership(room, state_set)
 
       {:ok, state_set, room, event}
     else
@@ -650,5 +652,35 @@ defmodule Architex.RoomServer do
         on: a.id == jr.account_id,
         where: jr.room_id == ^room_id and a.localpart in ^not_joined_localparts
     )
+  end
+
+  # TODO: Might be better to calculate membership changes...
+  @spec update_membership(Room.t(), t()) :: :ok
+  defp update_membership(%Room{id: room_id}, state_set) do
+    server_name = Architex.server_name()
+
+    state_set
+    |> Enum.filter(fn {{type, state_key}, _} ->
+      type == "m.room.member" and Architex.get_domain(state_key) == server_name
+    end)
+    |> Enum.group_by(
+      fn {_, %Event{content: %{"membership" => membership}}} ->
+        membership
+      end,
+      fn {{_, state_key}, _} ->
+        Architex.get_localpart(state_key)
+      end
+    )
+    |> Enum.each(fn {membership, localparts} ->
+      Repo.insert_all(
+        Membership,
+        from(a in Account,
+          where: a.localpart in ^localparts,
+          select: %{account_id: a.id, room_id: ^room_id, membership: ^membership}
+        ),
+        on_conflict: {:replace, [:membership]},
+        conflict_target: [:account_id, :room_id]
+      )
+    end)
   end
 end
