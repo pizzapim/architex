@@ -26,12 +26,22 @@ defmodule ArchitexWeb.Router do
     pipe_through :public
 
     scope "/r0" do
-      post "/register", RegisterController, :register
-      get "/register/available", AccountController, :available
-      get "/login", LoginController, :login_types
-      post "/login", LoginController, :login
       get "/directory/list/room/:room_id", RoomDirectoryController, :get_visibility
-      get "/profile/:user_id/avatar_url", ProfileController, :get_avatar_url
+
+      scope "/login" do
+        get "/", LoginController, :login_types
+        post "/", LoginController, :login
+      end
+
+      scope "/register" do
+        post "/", RegisterController, :register
+        get "/available", AccountController, :available
+      end
+
+      scope "/profile/:user_id" do
+        get "/avatar_url", ProfileController, :get_avatar_url
+        get "/displayname", ProfileController, :get_displayname
+      end
     end
 
     get "/versions", InfoController, :versions
@@ -56,7 +66,11 @@ defmodule ArchitexWeb.Router do
       get "/joined_rooms", RoomController, :joined_rooms
       get "/capabilities", InfoController, :capabilities
       get "/sync", SyncController, :sync
-      put "/profile/:user_id/avatar_url", ProfileController, :set_avatar_url
+
+      scope "/profile/:user_id" do
+        put "/avatar_url", ProfileController, :set_avatar_url
+        put "/displayname", ProfileController, :set_displayname
+      end
 
       scope "/directory" do
         put "/room/:alias", AliasesController, :create

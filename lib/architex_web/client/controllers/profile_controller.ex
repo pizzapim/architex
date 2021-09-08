@@ -1,4 +1,5 @@
 defmodule ArchitexWeb.Client.ProfileController do
+  # TODO: Changes should be propagated using join events and presence.
   use ArchitexWeb, :controller
 
   import ArchitexWeb.Error
@@ -10,17 +11,31 @@ defmodule ArchitexWeb.Client.ProfileController do
   alias Ecto.Changeset
 
   @doc """
+  Get the user's display name.
+
+  Action for GET /_matrix/client/r0/profile/{userId}/displayname.
+  """
+  def get_displayname(conn, %{"user_id" => user_id}) do
+    get_property(conn, :displayname, user_id)
+  end
+
+  @doc """
   Get the user's avatar URL.
 
   Action for GET /_matrix/client/r0/profile/{userId}/avatar_url.
   """
   def get_avatar_url(conn, %{"user_id" => user_id}) do
+    get_property(conn, :avatar_url, user_id)
+  end
+
+  defp get_property(conn, property_key, user_id) do
     case UserId.cast(user_id) do
       {:ok, %UserId{localpart: localpart, domain: domain}} ->
         if domain == Architex.server_name() do
           case Repo.one(from a in Account, where: a.localpart == ^localpart) do
-            %Account{avatar_url: avatar_url} ->
-              data = if avatar_url, do: %{avatar_url: avatar_url}, else: %{}
+            %Account{} = account ->
+              property_val = Map.get(account, property_key)
+              data = if property_val, do: %{property_key => property_val}, else: %{}
 
               conn
               |> put_status(200)
@@ -40,19 +55,32 @@ defmodule ArchitexWeb.Client.ProfileController do
   end
 
   @doc """
+  This API sets the given user's display name.
+
+  Action for PUT /_matrix/client/r0/profile/{userId}/displayname.
+  """
+  def set_displayname(conn, %{"user_id" => user_id} = params) do
+    displayname = Map.get(params, "displayname")
+
+    update_property(conn, :displayname, displayname, user_id)
+  end
+
+  @doc """
   This API sets the given user's avatar URL.
 
   Action for PUT /_matrix/client/r0/profile/{userId}/avatar_url.
   """
-  def set_avatar_url(%Conn{assigns: %{account: account}} = conn, %{"user_id" => user_id} = params) do
-    if Account.get_mxid(account) == user_id do
-      avatar_url = Map.get(params, "avatar_url")
+  def set_avatar_url(conn, %{"user_id" => user_id} = params) do
+    avatar_url = Map.get(params, "avatar_url")
 
-      if not is_nil(avatar_url) do
-        account
-        |> Changeset.change(avatar_url: avatar_url)
-        |> Repo.update()
-      end
+    update_property(conn, :avatar_url, avatar_url, user_id)
+  end
+
+  defp update_property(%Conn{assigns: %{account: account}} = conn, property_key, property, user_id) do
+    if Account.get_mxid(account) == user_id do
+      account
+      |> Changeset.change([{property_key, property}])
+      |> Repo.update()
 
       conn
       |> send_resp(200, [])

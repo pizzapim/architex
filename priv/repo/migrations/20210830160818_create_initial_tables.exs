@@ -6,6 +6,7 @@ defmodule Architex.Repo.Migrations.CreateInitialTables do
       add :localpart, :string, null: false
       add :password_hash, :string, size: 60, null: false
       add :avatar_url, :string, null: true
+      add :displayname, :string, null: true
       timestamps(updated_at: false)
     end
 
