@@ -17,14 +17,6 @@ defmodule Architex.Repo.Migrations.CreateInitialTables do
       add :visibility, :string, null: false, default: "public"
     end
 
-    create table(:joined_rooms, primary_key: false) do
-      add :account_id, references(:accounts), primary_key: true, null: false
-
-      add :room_id, references(:rooms, type: :string),
-        primary_key: true,
-        null: false
-    end
-
     create table(:events, primary_key: false) do
       add :nid, :serial, primary_key: true
       add :id, :string, null: false

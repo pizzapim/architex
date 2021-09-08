@@ -4,7 +4,7 @@ defmodule ArchitexWeb.Client.SyncController do
   import ArchitexWeb.Error
   import Ecto.Query
 
-  alias Architex.{Repo, Event, Account, Room, JoinedRoom}
+  alias Architex.{Repo, Event, Account, Room, Membership}
   alias Plug.Conn
 
   @doc """
@@ -26,10 +26,10 @@ defmodule ArchitexWeb.Client.SyncController do
 
     events_per_room =
       Event
-      |> join(:inner, [e], jr in JoinedRoom,
-        on: jr.room_id == e.room_id and jr.account_id == ^account_id
+      |> join(:inner, [e], m in Membership,
+        on: m.room_id == e.room_id and m.account_id == ^account_id and m.membership == "join"
       )
-      |> join(:inner, [e, jr], r in Room, on: r.id == jr.room_id)
+      |> join(:inner, [e, m], r in Room, on: r.id == m.room_id)
       |> order_by(asc: :origin_server_ts, asc: :nid)
       |> Repo.all()
       |> Enum.group_by(& &1.room_id)

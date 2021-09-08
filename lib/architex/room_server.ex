@@ -19,7 +19,6 @@ defmodule Architex.RoomServer do
     Event,
     StateResolution,
     Account,
-    JoinedRoom,
     Device,
     DeviceTransaction,
     Membership
@@ -606,8 +605,6 @@ defmodule Architex.RoomServer do
       room = Room.update_forward_extremities(event, room)
       event = Repo.insert!(event)
       state_set = StateResolution.resolve_forward_extremities(event)
-      # TODO: Do this as a background job, and not after every insert...
-      _ = update_joined_rooms(room, state_set)
       :ok = update_membership(room, state_set)
 
       {:ok, state_set, room, event}
@@ -616,45 +613,11 @@ defmodule Architex.RoomServer do
     end
   end
 
-  # Update local accounts' room membership if applicable.
-  @spec update_joined_rooms(Room.t(), t()) :: JoinedRoom.t() | nil
-  defp update_joined_rooms(%Room{id: room_id}, state_set) do
-    server_name = Architex.server_name()
-
-    {joined, not_joined} =
-      state_set
-      |> Enum.filter(fn {{type, state_key}, _} ->
-        type == "m.room.member" and Architex.get_domain(state_key) == server_name
-      end)
-      |> Enum.split_with(fn {_, %Event{content: %{"membership" => membership}}} ->
-        membership == "join"
-      end)
-
-    map_localparts =
-      &Enum.map(&1, fn {{_, state_key}, _} -> Architex.get_localpart(state_key) end)
-
-    joined_localparts = map_localparts.(joined)
-    not_joined_localparts = map_localparts.(not_joined)
-
-    _ =
-      Repo.insert_all(
-        JoinedRoom,
-        from(a in Account,
-          where: a.localpart in ^joined_localparts,
-          select: %{account_id: a.id, room_id: ^room_id}
-        ),
-        on_conflict: :nothing
-      )
-
-    Repo.delete_all(
-      from jr in JoinedRoom,
-        join: a in Account,
-        on: a.id == jr.account_id,
-        where: jr.room_id == ^room_id and a.localpart in ^not_joined_localparts
-    )
-  end
-
-  # TODO: Might be better to calculate membership changes...
+  # TODO: Might be better to calculate membership changes only...
+  # TODO: I don't think this should be a background job, as it get out-of-sync and users
+  # could access rooms they are not allowed to. Then again, maybe we should perform
+  # the "normal" authorization flow for local users as well, and treat the Membership
+  # table only as informational.
   @spec update_membership(Room.t(), t()) :: :ok
   defp update_membership(%Room{id: room_id}, state_set) do
     server_name = Architex.server_name()

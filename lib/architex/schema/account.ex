@@ -3,7 +3,7 @@ defmodule Architex.Account do
 
   import Ecto.{Changeset, Query}
 
-  alias Architex.{Repo, Account, Device, Room, JoinedRoom}
+  alias Architex.{Repo, Account, Device, Room, Membership}
   alias ArchitexWeb.Client.Request.{Register, Login}
   alias Ecto.{Multi, Changeset}
 
@@ -19,8 +19,19 @@ defmodule Architex.Account do
     has_many :devices, Device
 
     many_to_many :joined_rooms, Room,
-      join_through: JoinedRoom,
-      join_keys: [account_id: :id, room_id: :id]
+      join_through: Membership,
+      join_keys: [account_id: :id, room_id: :id],
+      join_where: [membership: "join"]
+
+    many_to_many :invited_rooms, Room,
+      join_through: Membership,
+      join_keys: [account_id: :id, room_id: :id],
+      join_where: [membership: "invite"]
+
+    many_to_many :left_rooms, Room,
+      join_through: Membership,
+      join_keys: [account_id: :id, room_id: :id],
+      join_where: [membership: "leave"]
 
     timestamps(updated_at: false)
   end
