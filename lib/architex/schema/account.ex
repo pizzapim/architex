@@ -16,6 +16,7 @@ defmodule Architex.Account do
   schema "accounts" do
     field :localpart, :string
     field :password_hash, :string, redact: true
+    field :avatar_url
     has_many :devices, Device
 
     many_to_many :joined_rooms, Room,

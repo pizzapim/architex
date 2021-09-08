@@ -5,13 +5,14 @@ defmodule Architex.Repo.Migrations.CreateInitialTables do
     create table(:accounts) do
       add :localpart, :string, null: false
       add :password_hash, :string, size: 60, null: false
+      add :avatar_url, :string, null: true
       timestamps(updated_at: false)
     end
 
     create index(:accounts, [:localpart], unique: true)
 
     create table(:rooms, primary_key: false) do
-      add :id, :string, primary_key: true, null: false
+      add :id, :string, primary_key: true
       add :state, {:array, {:array, :string}}, default: [], null: false
       add :forward_extremities, {:array, :string}, default: [], null: false
       add :visibility, :string, null: false, default: "public"
@@ -43,7 +44,7 @@ defmodule Architex.Repo.Migrations.CreateInitialTables do
 
     create table(:server_key_info, primary_key: false) do
       add :valid_until, :bigint, default: 0, null: false
-      add :server_name, :string, primary_key: true, null: false
+      add :server_name, :string, primary_key: true
     end
 
     create table(:signing_keys, primary_key: false) do
@@ -51,12 +52,12 @@ defmodule Architex.Repo.Migrations.CreateInitialTables do
           references(:server_key_info, column: :server_name, type: :string, on_delete: :delete_all),
           null: false
 
-      add :signing_key_id, :string, primary_key: true, null: false
+      add :signing_key_id, :string, primary_key: true
       add :signing_key, :binary, null: false
     end
 
     create table(:aliases, primary_key: false) do
-      add :alias, :string, primary_key: true, null: false
+      add :alias, :string, primary_key: true
       add :room_id, references(:rooms, type: :string, on_delete: :delete_all), null: false
     end
 
@@ -76,7 +77,7 @@ defmodule Architex.Repo.Migrations.CreateInitialTables do
     create index(:devices, [:access_token], unique: true)
 
     create table(:device_transactions, primary_key: false) do
-      add :txn_id, :string, primary_key: true, null: false
+      add :txn_id, :string, primary_key: true
 
       add :device_nid, references(:devices, column: :nid, on_delete: :delete_all),
         primary_key: true

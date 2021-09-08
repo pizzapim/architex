@@ -1,7 +1,6 @@
 defmodule ArchitexWeb.Client.AccountController do
   use ArchitexWeb, :controller
 
-  import Architex
   import ArchitexWeb.Error
 
   alias Architex.{Account, Repo}
@@ -32,7 +31,7 @@ defmodule ArchitexWeb.Client.AccountController do
   Action for GET /_matrix/client/r0/account/whoami.
   """
   def whoami(%Conn{assigns: %{account: %Account{localpart: localpart}}} = conn, _params) do
-    data = %{user_id: get_mxid(localpart)}
+    data = %{user_id: Architex.get_mxid(localpart)}
 
     conn
     |> put_status(200)

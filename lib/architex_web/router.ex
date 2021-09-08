@@ -31,6 +31,7 @@ defmodule ArchitexWeb.Router do
       get "/login", LoginController, :login_types
       post "/login", LoginController, :login
       get "/directory/list/room/:room_id", RoomDirectoryController, :get_visibility
+      get "/profile/:user_id/avatar_url", ProfileController, :get_avatar_url
     end
 
     get "/versions", InfoController, :versions
@@ -55,6 +56,7 @@ defmodule ArchitexWeb.Router do
       get "/joined_rooms", RoomController, :joined_rooms
       get "/capabilities", InfoController, :capabilities
       get "/sync", SyncController, :sync
+      put "/profile/:user_id/avatar_url", ProfileController, :set_avatar_url
 
       scope "/directory" do
         put "/room/:alias", AliasesController, :create

@@ -263,6 +263,10 @@ defmodule Architex do
   end
 
   # https://stackoverflow.com/a/45754361
+  @doc """
+  Validate whether the given fields are not nil for the changeset.
+  """
+  @spec validate_not_nil(Ecto.Changeset.t(), [atom()]) :: Ecto.Changeset.t()
   def validate_not_nil(changeset, fields) do
     Enum.reduce(fields, changeset, fn field, changeset ->
       if Ecto.Changeset.get_field(changeset, field) == nil do
