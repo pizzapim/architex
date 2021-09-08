@@ -39,6 +39,7 @@ defmodule ArchitexWeb.Router do
       end
 
       scope "/profile/:user_id" do
+        get "/", ProfileController, :profile
         get "/avatar_url", ProfileController, :get_avatar_url
         get "/displayname", ProfileController, :get_displayname
       end

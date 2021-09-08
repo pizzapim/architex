@@ -11,6 +11,38 @@ defmodule ArchitexWeb.Client.ProfileController do
   alias Ecto.Changeset
 
   @doc """
+  Get the combined profile information for this user.
+
+  Action for GET /_matrix/client/r0/profile/{userId}.
+  """
+  def profile(conn, %{"user_id" => user_id}) do
+    case UserId.cast(user_id) do
+      {:ok, %UserId{localpart: localpart, domain: domain}} ->
+        if domain == Architex.server_name() do
+          case Repo.one(from a in Account, where: a.localpart == ^localpart) do
+            %Account{displayname: displayname, avatar_url: avatar_url} ->
+              data = %{}
+              data = if avatar_url, do: Map.put(data, :avatar_url, avatar_url), else: data
+              data = if displayname, do: Map.put(data, :displayname, displayname), else: data
+
+              conn
+              |> put_status(200)
+              |> json(data)
+
+            nil ->
+              put_error(conn, :not_found, "User was not found.")
+          end
+        else
+          # TODO: Use federation to lookup information.
+          put_error(conn, :not_found, "User was not found.")
+        end
+
+      :error ->
+        put_error(conn, :not_found, "User ID is invalid.")
+    end
+  end
+
+  @doc """
   Get the user's display name.
 
   Action for GET /_matrix/client/r0/profile/{userId}/displayname.
@@ -45,7 +77,7 @@ defmodule ArchitexWeb.Client.ProfileController do
               put_error(conn, :not_found, "User was not found.")
           end
         else
-          # TODO: Use federation to lookup avatar URL.
+          # TODO: Use federation to lookup information.
           put_error(conn, :not_found, "User was not found.")
         end
 
