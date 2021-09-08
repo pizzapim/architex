@@ -56,6 +56,7 @@ Here, implemented and some unimplemented features are listed.
 - GET /_matrix/client/r0/directory/list/room/{roomId}
 - PUT /_matrix/client/r0/directory/list/room/{roomId}
 - GET /_matrix/client/r0/capabilities
+- GET /_matrix/client/r0/profile/{userId}
 - GET /_matrix/client/r0/profile/{userId}/avatar_url: Except federation.
 - PUT /_matrix/client/r0/profile/{userId}/avatar_url
 - GET /_matrix/client/r0/profile/{userId}/displayname: Except federation.
