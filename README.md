@@ -3,6 +3,13 @@
 A Matrix homeserver written in Elixir.
 Currently, this project is in a very early stage.
 
+## General architecture
+
+For each room that a homeserver is involved in, there is a supervised GenServer (named [RoomServer](lib/architex/room_server.ex)) that holds/manages the room's state.
+These RoomServers are responsible for state resolution and authorization.
+Database schemas are located at [lib/architex/schema/](lib/architex/schema/).
+Requests from the federation API as well as the client API are validated using [Ecto](https://hex.pm/packages/ecto)'s `embedded_schema`s, located at [lib/architex_web/api_schemas/](lib/architex_web/api_schemas/).
+
 ## Noteworthy contributions
 
 * `lib/architex/state_resolution.ex`: Implementation of version 2 of the Matrix state resolution algorithm.
