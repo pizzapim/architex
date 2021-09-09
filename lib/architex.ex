@@ -174,9 +174,9 @@ defmodule Architex do
   @doc """
   Validate a changeset's field where the reason for invalidation is not needed.
   """
-  @spec validate_change_simple(Ecto.Changeset.t(), atom(), (term() -> boolean())) ::
+  @spec validate_change_truthy(Ecto.Changeset.t(), atom(), (term() -> boolean())) ::
           Ecto.Changeset.t()
-  def validate_change_simple(changeset, field, func) do
+  def validate_change_truthy(changeset, field, func) do
     augmented_func = fn _, val ->
       if func.(val), do: [], else: [{field, "invalid"}]
     end

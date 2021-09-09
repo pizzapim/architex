@@ -1,4 +1,9 @@
 defmodule ArchitexWeb.Federation.HTTPClient do
+  @moduledoc """
+  This module provides functions to interact with other homeservers
+  using the Matrix federation API.
+  """
+  # TODO: Investigate request timeouts.
   use Tesla
 
   alias ArchitexWeb.Endpoint
@@ -6,11 +11,27 @@ defmodule ArchitexWeb.Federation.HTTPClient do
   alias ArchitexWeb.Federation.Middleware.SignRequest
   alias ArchitexWeb.Router.Helpers, as: RouteHelpers
 
-  # TODO: Maybe create database-backed homeserver struct to pass to client function.
-  # TODO: Fix error propagation.
+  @type t :: schema_response() | map_response()
+
+  @type schema_response ::
+          {:ok, struct()}
+          | {:error, :status, Tesla.Env.t()}
+          | {:error, :validation, Ecto.Changeset.t()}
+          | {:error, :request, any()}
+
+  @type map_response ::
+          {:ok, map()}
+          | {:error, :status, Tesla.Env.t()}
+          | {:error, :validation, Ecto.Changeset.t()}
+          | {:error, :request, any()}
 
   @adapter {Tesla.Adapter.Finch, name: ArchitexWeb.HTTPClient}
 
+  @doc """
+  Get a Tesla client for the given server name, to be used for
+  interacting with other homeservers.
+  """
+  @spec client(String.t()) :: Tesla.Client.t()
   def client(server_name) do
     Tesla.client(
       [
@@ -23,6 +44,10 @@ defmodule ArchitexWeb.Federation.HTTPClient do
     )
   end
 
+  @doc """
+  Get the signing keys of a homeserver.
+  """
+  @spec get_signing_keys(Tesla.Client.t()) :: {:ok, GetSigningKeys.t()} | :error
   def get_signing_keys(client) do
     path = RouteHelpers.key_path(Endpoint, :get_signing_keys)
 
@@ -53,40 +78,61 @@ defmodule ArchitexWeb.Federation.HTTPClient do
     end
   end
 
+  @doc """
+  Get the profile of a user.
+  """
+  @spec query_profile(Tesla.Client.t(), String.t(), String.t() | nil) :: map_response()
   def query_profile(client, user_id, field \\ nil) do
     path = RouteHelpers.query_path(Endpoint, :profile) |> Tesla.build_url(user_id: user_id)
     path = if field, do: Tesla.build_url(path, field: field), else: path
 
-    Tesla.get(client, path)
+    tesla_request(:get, client, path)
   end
 
-  def get_event(client, event_id) do
-    path = RouteHelpers.event_path(Endpoint, :event, event_id)
+  # def get_event(client, event_id) do
+  #   path = RouteHelpers.event_path(Endpoint, :event, event_id)
 
-    Tesla.get(client, path)
-  end
+  #   Tesla.get(client, path)
+  # end
 
-  def get_state(client, room_id, event_id) do
-    path =
-      RouteHelpers.event_path(Endpoint, :state, room_id) |> Tesla.build_url(event_id: event_id)
+  # def get_state(client, room_id, event_id) do
+  #   path =
+  #     RouteHelpers.event_path(Endpoint, :state, room_id) |> Tesla.build_url(event_id: event_id)
 
-    Tesla.get(client, path)
-  end
+  #   Tesla.get(client, path)
+  # end
 
-  def get_state_ids(client, room_id, event_id) do
-    path =
-      RouteHelpers.event_path(Endpoint, :state_ids, room_id)
-      |> Tesla.build_url(event_id: event_id)
+  # def get_state_ids(client, room_id, event_id) do
+  #   path =
+  #     RouteHelpers.event_path(Endpoint, :state_ids, room_id)
+  #     |> Tesla.build_url(event_id: event_id)
 
-    Tesla.get(client, path)
-  end
+  #   Tesla.get(client, path)
+  # end
 
-  defp tesla_request(method, client, path, request_schema) do
-    with {:ok, %Tesla.Env{body: body}} <- Tesla.request(client, url: path, method: method),
-         %Ecto.Changeset{valid?: true} = cs <- apply(request_schema, :changeset, [body]) do
-      {:ok, Ecto.Changeset.apply_changes(cs)}
-    else
-      _ -> :error
+  # Perform a Tesla request and validate the response with the given
+  # Ecto schema struct.
+  @spec tesla_request(atom(), Tesla.Client.t(), String.t(), module()) :: t()
+  defp tesla_request(method, client, path, request_schema \\ nil) do
+    case Tesla.request(client, url: path, method: method) do
+      {:ok, %Tesla.Env{status: status} = env} when status != 200 ->
+        {:error, :status, env}
+
+      {:ok, %Tesla.Env{body: body}} ->
+        if request_schema do
+          case apply(request_schema, :parse, [body]) do
+            {:ok, response} ->
+              {:ok, response}
+
+            {:error, changeset} ->
+              {:error, :validation, changeset}
+          end
+        else
+          {:ok, body}
+        end
+
+      {:error, tesla_error} ->
+        {:error, :request, tesla_error}
     end
   end
 end

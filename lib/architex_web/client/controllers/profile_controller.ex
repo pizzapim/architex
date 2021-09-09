@@ -7,6 +7,7 @@ defmodule ArchitexWeb.Client.ProfileController do
 
   alias Architex.{Repo, Account}
   alias Architex.Types.UserId
+  alias ArchitexWeb.Federation.HTTPClient
   alias Plug.Conn
   alias Ecto.Changeset
 
@@ -33,8 +34,15 @@ defmodule ArchitexWeb.Client.ProfileController do
               put_error(conn, :not_found, "User was not found.")
           end
         else
-          # TODO: Use federation to lookup information.
-          put_error(conn, :not_found, "User was not found.")
+          case HTTPClient.client(domain) |> HTTPClient.query_profile(user_id) do
+            {:ok, response} ->
+              conn
+              |> put_status(200)
+              |> json(response)
+
+            {:error, _, _} ->
+              put_error(conn, :not_found, "User was not found.")
+          end
         end
 
       :error ->
@@ -77,8 +85,15 @@ defmodule ArchitexWeb.Client.ProfileController do
               put_error(conn, :not_found, "User was not found.")
           end
         else
-          # TODO: Use federation to lookup information.
-          put_error(conn, :not_found, "User was not found.")
+          case HTTPClient.client(domain) |> HTTPClient.query_profile(user_id, Atom.to_string(property_key)) do
+            {:ok, response} ->
+              conn
+              |> put_status(200)
+              |> json(response)
+
+            {:error, _, _} ->
+              put_error(conn, :not_found, "User was not found.")
+          end
         end
 
       :error ->
@@ -108,7 +123,12 @@ defmodule ArchitexWeb.Client.ProfileController do
     update_property(conn, :avatar_url, avatar_url, user_id)
   end
 
-  defp update_property(%Conn{assigns: %{account: account}} = conn, property_key, property, user_id) do
+  defp update_property(
+         %Conn{assigns: %{account: account}} = conn,
+         property_key,
+         property,
+         user_id
+       ) do
     if Account.get_mxid(account) == user_id do
       account
       |> Changeset.change([{property_key, property}])

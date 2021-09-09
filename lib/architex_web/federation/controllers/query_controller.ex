@@ -38,15 +38,27 @@ defmodule ArchitexWeb.Federation.QueryController do
   Action for GET /_matrix/federation/v1/query/profile.
   """
   def profile(conn, params) do
-    with {:ok, %ProfileRequest{user_id: %UserId{localpart: localpart, domain: domain}}} <-
+    with {:ok,
+          %ProfileRequest{user_id: %UserId{localpart: localpart, domain: domain}, field: field}} <-
            ProfileRequest.validate(params) do
       if domain == Architex.server_name() do
         case Repo.one(from a in Account, where: a.localpart == ^localpart) do
-          %Account{} ->
-            # TODO: Return displayname and avatar_url when we implement them.
+          %Account{displayname: displayname, avatar_url: avatar_url} ->
+            data = %{}
+
+            data =
+              if field == "displayname" or (field == nil and displayname != nil),
+                do: Map.put(data, :displayname, displayname),
+                else: data
+
+            data =
+              if field == "avatar_url" or (field == nil and avatar_url != nil),
+                do: Map.put(data, :avatar_url, avatar_url),
+                else: data
+
             conn
             |> put_status(200)
-            |> json(%{})
+            |> json(data)
 
           nil ->
             put_error(conn, :not_found, "User does not exist.")
