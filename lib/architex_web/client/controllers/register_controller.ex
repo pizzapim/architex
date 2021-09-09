@@ -2,11 +2,9 @@ defmodule ArchitexWeb.Client.RegisterController do
   use ArchitexWeb, :controller
 
   import ArchitexWeb.Error
-  import Ecto.Changeset
 
   alias Architex.{Repo, Account, Device}
   alias ArchitexWeb.Client.Request.Register
-  alias Ecto.Changeset
 
   @register_type "m.login.dummy"
 
@@ -16,35 +14,32 @@ defmodule ArchitexWeb.Client.RegisterController do
   Action for POST /_matrix/client/r0/register.
   """
   def register(conn, %{"auth" => %{"type" => @register_type}} = params) do
-    case Register.changeset(params) do
-      %Changeset{valid?: true} = cs ->
-        %Register{inhibit_login: inhibit_login} = input = apply_changes(cs)
+    with {:ok, %Register{inhibit_login: inhibit_login} = request} <- Register.parse(params) do
+      case Account.register(request) |> Repo.transaction() do
+        {:ok,
+         %{
+           account: %Account{localpart: localpart},
+           device: %Device{id: device_id, access_token: access_token}
+         }} ->
+          data = %{user_id: Architex.get_mxid(localpart)}
 
-        case Account.register(input) |> Repo.transaction() do
-          {:ok,
-           %{
-             account: %Account{localpart: localpart},
-             device: %Device{id: device_id, access_token: access_token}
-           }} ->
-            data = %{user_id: Architex.get_mxid(localpart)}
+          data =
+            if not inhibit_login do
+              data
+              |> Map.put(:device_id, device_id)
+              |> Map.put(:access_token, access_token)
+            else
+              data
+            end
 
-            data =
-              if not inhibit_login do
-                data
-                |> Map.put(:device_id, device_id)
-                |> Map.put(:access_token, access_token)
-              else
-                data
-              end
+          conn
+          |> put_status(200)
+          |> json(data)
 
-            conn
-            |> put_status(200)
-            |> json(data)
-
-          {:error, _, cs, _} ->
-            put_error(conn, Register.get_error(cs))
-        end
-
+        {:error, _, cs, _} ->
+          put_error(conn, Register.get_error(cs))
+      end
+    else
       _ ->
         put_error(conn, :bad_json)
     end

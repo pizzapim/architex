@@ -1,9 +1,5 @@
 defmodule ArchitexWeb.Client.Request.CreateRoom do
-  use Ecto.Schema
-
-  import Ecto.Changeset
-
-  alias Ecto.Changeset
+  use ArchitexWeb.APIRequest
 
   @type t :: %__MODULE__{
           visibility: String.t() | nil,
@@ -29,8 +25,8 @@ defmodule ArchitexWeb.Client.Request.CreateRoom do
     # is_direct, power_level_content_override
   end
 
-  def changeset(params) do
-    %__MODULE__{}
+  def changeset(data, params) do
+    data
     |> cast(params, [
       :visibility,
       :room_alias_name,
@@ -42,7 +38,4 @@ defmodule ArchitexWeb.Client.Request.CreateRoom do
     ])
     |> validate_inclusion(:preset, ["private_chat", "public_chat", "trusted_private_chat"])
   end
-
-  def get_error(%Changeset{errors: [error | _]}), do: get_error(error)
-  def get_error(_), do: :bad_json
 end

@@ -1,5 +1,5 @@
 defmodule ArchitexWeb.Client.Request.Ban do
-  use ArchitexWeb.Request
+  use ArchitexWeb.APIRequest
 
   @type t :: %__MODULE__{
           user_id: String.t(),

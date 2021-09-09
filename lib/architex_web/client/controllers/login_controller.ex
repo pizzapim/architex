@@ -2,11 +2,9 @@ defmodule ArchitexWeb.Client.LoginController do
   use ArchitexWeb, :controller
 
   import ArchitexWeb.Error
-  import Ecto.Changeset
 
   alias Architex.{Repo, Account, Device}
   alias ArchitexWeb.Client.Request.Login
-  alias Ecto.Changeset
 
   @login_type "m.login.password"
 
@@ -33,32 +31,28 @@ defmodule ArchitexWeb.Client.LoginController do
         conn,
         %{"type" => @login_type, "identifier" => %{"type" => "m.id.user"}} = params
       ) do
-    case Login.changeset(params) do
-      %Changeset{valid?: true} = cs ->
-        input = apply_changes(cs)
+    with {:ok, request} <- Login.parse(params) do
+      case Account.login(request) |> Repo.transaction() do
+        {:ok,
+         {%Account{localpart: localpart}, %Device{access_token: access_token, id: device_id}}} ->
+          data = %{
+            user_id: Architex.get_mxid(localpart),
+            access_token: access_token,
+            device_id: device_id
+          }
 
-        case Account.login(input) |> Repo.transaction() do
-          {:ok,
-           {%Account{localpart: localpart}, %Device{access_token: access_token, id: device_id}}} ->
-            data = %{
-              user_id: Architex.get_mxid(localpart),
-              access_token: access_token,
-              device_id: device_id
-            }
+          conn
+          |> put_status(200)
+          |> json(data)
 
-            conn
-            |> put_status(200)
-            |> json(data)
+        {:error, error} when is_atom(error) ->
+          put_error(conn, error)
 
-          {:error, error} when is_atom(error) ->
-            put_error(conn, error)
-
-          {:error, _} ->
-            put_error(conn, :unknown)
-        end
-
-      _ ->
-        put_error(conn, :bad_json)
+        {:error, _} ->
+          put_error(conn, :unknown)
+      end
+    else
+      _ -> put_error(conn, :bad_json)
     end
   end
 

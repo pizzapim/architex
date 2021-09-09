@@ -1,4 +1,4 @@
-defmodule ArchitexWeb.Request do
+defmodule ArchitexWeb.APIRequest do
   import Ecto.Changeset
 
   alias Ecto.Changeset
@@ -19,7 +19,7 @@ defmodule ArchitexWeb.Request do
 
       @spec parse(map()) :: {:ok, struct()} | {:error, Changeset.t()}
       def parse(params) do
-        ArchitexWeb.Request.parse(__MODULE__, params)
+        ArchitexWeb.APIRequest.parse(__MODULE__, params)
       end
     end
   end

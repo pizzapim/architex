@@ -7,7 +7,7 @@ defmodule ArchitexWeb.Federation.HTTPClient do
   use Tesla
 
   alias ArchitexWeb.Endpoint
-  alias ArchitexWeb.Federation.Request.GetSigningKeys
+  alias ArchitexWeb.Federation.Response.GetSigningKeys
   alias ArchitexWeb.Federation.Middleware.SignRequest
   alias ArchitexWeb.Router.Helpers, as: RouteHelpers
 

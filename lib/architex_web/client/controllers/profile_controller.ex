@@ -85,7 +85,8 @@ defmodule ArchitexWeb.Client.ProfileController do
               put_error(conn, :not_found, "User was not found.")
           end
         else
-          case HTTPClient.client(domain) |> HTTPClient.query_profile(user_id, Atom.to_string(property_key)) do
+          case HTTPClient.client(domain)
+               |> HTTPClient.query_profile(user_id, Atom.to_string(property_key)) do
             {:ok, response} ->
               conn
               |> put_status(200)

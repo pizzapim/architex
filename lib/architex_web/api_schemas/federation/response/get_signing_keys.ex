@@ -1,5 +1,5 @@
-defmodule ArchitexWeb.Federation.Request.GetSigningKeys do
-  use ArchitexWeb.Request
+defmodule ArchitexWeb.Federation.Response.GetSigningKeys do
+  use ArchitexWeb.APIRequest
 
   @type t :: %__MODULE__{
           server_name: String.t(),

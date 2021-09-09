@@ -1,5 +1,5 @@
 defmodule ArchitexWeb.Client.Request.Messages do
-  use ArchitexWeb.Request
+  use ArchitexWeb.APIRequest
 
   @type t :: %__MODULE__{
           from: String.t(),

@@ -1,7 +1,5 @@
 defmodule ArchitexWeb.Client.Request.Register do
-  use Ecto.Schema
-
-  import Ecto.Changeset
+  use ArchitexWeb.APIRequest
 
   alias Ecto.Changeset
 
@@ -22,8 +20,8 @@ defmodule ArchitexWeb.Client.Request.Register do
     field :inhibit_login, :boolean, default: false
   end
 
-  def changeset(params) do
-    %__MODULE__{}
+  def changeset(data, params) do
+    data
     |> cast(params, [
       :device_id,
       :initial_device_display_name,

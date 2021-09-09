@@ -7,29 +7,7 @@ defmodule ArchitexWeb.Federation.QueryController do
 
   alias Architex.{Repo, Account}
   alias Architex.Types.UserId
-
-  defmodule ProfileRequest do
-    use Ecto.Schema
-
-    import Ecto.Changeset
-
-    @primary_key false
-    embedded_schema do
-      field :user_id, UserId
-      field :field, :string
-    end
-
-    def validate(params) do
-      %__MODULE__{}
-      |> cast(params, [:user_id, :field])
-      |> validate_required([:user_id])
-      |> validate_inclusion(:field, ["displayname", "avatar_url"])
-      |> then(fn
-        %Ecto.Changeset{valid?: true} = cs -> {:ok, apply_changes(cs)}
-        _ -> :error
-      end)
-    end
-  end
+  alias ArchitexWeb.Federation.Request.Profile
 
   @doc """
   Performs a query to get profile information, such as a display name or avatar,
@@ -38,9 +16,8 @@ defmodule ArchitexWeb.Federation.QueryController do
   Action for GET /_matrix/federation/v1/query/profile.
   """
   def profile(conn, params) do
-    with {:ok,
-          %ProfileRequest{user_id: %UserId{localpart: localpart, domain: domain}, field: field}} <-
-           ProfileRequest.validate(params) do
+    with {:ok, %Profile{user_id: %UserId{localpart: localpart, domain: domain}, field: field}} <-
+           Profile.parse(params) do
       if domain == Architex.server_name() do
         case Repo.one(from a in Account, where: a.localpart == ^localpart) do
           %Account{displayname: displayname, avatar_url: avatar_url} ->

@@ -1,8 +1,7 @@
 defmodule ArchitexWeb.Client.Request.Login do
-  use Ecto.Schema
+  use ArchitexWeb.APIRequest
 
-  import Ecto.Changeset
-
+  # TODO: Identifier
   @type t :: %__MODULE__{
           type: String.t(),
           password: String.t(),
@@ -23,8 +22,8 @@ defmodule ArchitexWeb.Client.Request.Login do
     end
   end
 
-  def changeset(params) do
-    %__MODULE__{}
+  def changeset(data, params) do
+    data
     |> cast(params, [:type, :password, :device_id, :initial_device_display_name])
     |> cast_embed(:identifier, with: &identifier_changeset/2, required: true)
     |> validate_required([:type, :password])

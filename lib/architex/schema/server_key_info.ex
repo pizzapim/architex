@@ -5,7 +5,7 @@ defmodule Architex.ServerKeyInfo do
 
   alias Architex.{Repo, ServerKeyInfo, SigningKey}
   alias ArchitexWeb.Federation.HTTPClient
-  alias ArchitexWeb.Federation.Request.GetSigningKeys
+  alias ArchitexWeb.Federation.Response.GetSigningKeys
   alias Ecto.Multi
 
   @primary_key {:server_name, :string, []}

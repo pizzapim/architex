@@ -2,12 +2,11 @@ defmodule ArchitexWeb.Client.RoomController do
   use ArchitexWeb, :controller
 
   import ArchitexWeb.Error
-  import Ecto.{Changeset, Query}
+  import Ecto.Query
 
   alias Architex.{Repo, Room, RoomServer, Event}
   alias Architex.Types.UserId
   alias ArchitexWeb.Client.Request.{CreateRoom, Kick, Ban, Messages}
-  alias Ecto.Changeset
   alias Plug.Conn
 
   @doc """
@@ -16,23 +15,20 @@ defmodule ArchitexWeb.Client.RoomController do
   Action for POST /_matrix/client/r0/createRoom.
   """
   def create(%Conn{assigns: %{account: account}} = conn, params) do
-    case CreateRoom.changeset(params) do
-      %Changeset{valid?: true} = cs ->
-        input = apply_changes(cs)
+    with {:ok, request} <- CreateRoom.parse(params) do
+      case Room.create(account, request) do
+        {:ok, room_id} ->
+          conn
+          |> put_status(200)
+          |> json(%{room_id: room_id})
 
-        case Room.create(account, input) do
-          {:ok, room_id} ->
-            conn
-            |> put_status(200)
-            |> json(%{room_id: room_id})
+        {:error, :authorization} ->
+          put_error(conn, :invalid_room_state)
 
-          {:error, :authorization} ->
-            put_error(conn, :invalid_room_state)
-
-          {:error, :unknown} ->
-            put_error(conn, :unknown)
-        end
-
+        {:error, :unknown} ->
+          put_error(conn, :unknown)
+      end
+    else
       _ ->
         put_error(conn, :bad_json)
     end

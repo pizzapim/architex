@@ -1,5 +1,5 @@
 defmodule ArchitexWeb.Client.Request.Sync do
-  use ArchitexWeb.Request
+  use ArchitexWeb.APIRequest
 
   @type t :: %__MODULE__{}
 
