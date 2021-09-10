@@ -205,7 +205,7 @@ defmodule ArchitexWeb.Client.RoomController do
 
   Action for PUT /_matrix/client/r0/rooms/{roomId}/send/{eventType}/{txnId}.
   """
-  def send_message(
+  def send_message_event(
         %Conn{assigns: %{account: account, device: device}, body_params: body_params} = conn,
         %{
           "room_id" => room_id,
@@ -215,7 +215,46 @@ defmodule ArchitexWeb.Client.RoomController do
       ) do
     case RoomServer.get_room_server(room_id) do
       {:ok, pid} ->
-        case RoomServer.send_message(pid, account, device, event_type, body_params, txn_id) do
+        case RoomServer.send_message_event(pid, account, device, event_type, body_params, txn_id) do
+          {:ok, event_id} ->
+            conn
+            |> put_status(200)
+            |> json(%{event_id: event_id})
+
+          {:error, _} ->
+            put_error(conn, :unknown)
+        end
+
+      {:error, :not_found} ->
+        put_error(conn, :not_found, "The given room was not found.")
+    end
+  end
+
+  @doc """
+  State events can be sent using this endpoint.
+
+  I don't know why, but the spec is very scared of trailing slashes and accidentally
+  using a transaction ID as the state key.
+  I take no precaution against these things, it's the responsibility of the client.
+  Action for PUT /_matrix/client/r0/rooms/{roomId}/state/{eventType}/{stateKey}.
+  """
+  def send_state_event(conn, %{"state_key" => [state_key | _]} = params) do
+    do_send_state_event(conn, params, state_key)
+  end
+
+  def send_state_event(conn, params) do
+    do_send_state_event(conn, params, "")
+  end
+
+  defp do_send_state_event(
+         %Conn{assigns: %{account: account}, body_params: body_params} = conn,
+         %{"room_id" => room_id, "event_type" => event_type},
+         state_key
+       ) do
+    # TODO: Check aliases according to spec.
+    case RoomServer.get_room_server(room_id) do
+      {:ok, pid} ->
+        case RoomServer.send_state_event(pid, account, event_type, body_params, state_key) do
           {:ok, event_id} ->
             conn
             |> put_status(200)

@@ -165,12 +165,21 @@ defmodule Architex.RoomServer do
   end
 
   @doc """
-  Send a message to this room.
+  Send a message event to this room.
   """
-  @spec send_message(pid(), Account.t(), Device.t(), String.t(), map(), String.t()) ::
+  @spec send_message_event(pid(), Account.t(), Device.t(), String.t(), map(), String.t()) ::
           {:ok, String.t()} | {:error, atom()}
-  def send_message(pid, account, device, event_type, content, txn_id) do
-    GenServer.call(pid, {:send_message, account, device, event_type, content, txn_id})
+  def send_message_event(pid, account, device, event_type, content, txn_id) do
+    GenServer.call(pid, {:send_message_event, account, device, event_type, content, txn_id})
+  end
+
+  @doc """
+  Send a state event to this room.
+  """
+  @spec send_state_event(pid(), Account.t(), String.t(), map(), String.t()) ::
+          {:ok, String.t()} | {:error, atom()}
+  def send_state_event(pid, account, event_type, content, state_key) do
+    GenServer.call(pid, {:send_state_event, account, event_type, content, state_key})
   end
 
   ### Implementation
@@ -354,13 +363,13 @@ defmodule Architex.RoomServer do
   end
 
   def handle_call(
-        {:send_message, account, device, event_type, content, txn_id},
+        {:send_message_event, account, device, event_type, content, txn_id},
         _from,
         %{room: room, state_set: state_set} = state
       ) do
-    message_event = Event.custom_message(room, account, event_type, content)
+    message_event = Event.custom_event(room, account, event_type, content)
 
-    case Repo.transaction(insert_custom_message(state_set, room, device, message_event, txn_id)) do
+    case Repo.transaction(insert_event_with_txn(state_set, room, device, message_event, txn_id)) do
       {:ok, {state_set, room, event_id}} ->
         {:reply, {:ok, event_id}, %{state | state_set: state_set, room: room}}
 
@@ -369,7 +378,25 @@ defmodule Architex.RoomServer do
     end
   end
 
-  defp insert_custom_message(
+  def handle_call(
+        {:send_state_event, account, event_type, content, state_key},
+        _from,
+        %{room: room, state_set: state_set} = state
+      ) do
+    state_event = Event.custom_state_event(room, account, event_type, content, state_key)
+
+    case Repo.transaction(insert_single_event(room, state_set, state_event)) do
+      {:ok, {state_set, room, %Event{id: event_id}}} ->
+        {:reply, {:ok, event_id}, %{state | state_set: state_set, room: room}}
+
+      {:error, reason} ->
+        {:reply, {:error, reason}, state}
+    end
+  end
+
+  @spec insert_event_with_txn(t(), Room.t(), Device.t(), %Event{}, String.t()) :: 
+          (() -> {t(), Room.t(), String.t()} | {:error, atom()})
+  defp insert_event_with_txn(
          state_set,
          room,
          %Device{nid: device_nid} = device,

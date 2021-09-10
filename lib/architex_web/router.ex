@@ -85,8 +85,9 @@ defmodule ArchitexWeb.Router do
         post "/kick", RoomController, :kick
         post "/ban", RoomController, :ban
         post "/unban", RoomController, :unban
-        put "/send/:event_type/:txn_id", RoomController, :send_message
+        put "/send/:event_type/:txn_id", RoomController, :send_message_event
         get "/messages", RoomController, :messages
+        put "/state/:event_type/*state_key", RoomController, :send_state_event
       end
     end
   end

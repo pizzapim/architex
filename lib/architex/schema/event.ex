@@ -56,13 +56,18 @@ defmodule Architex.Event do
     }
   end
 
-  @spec custom_message(Room.t(), Account.t(), String.t(), map()) :: %Event{}
-  def custom_message(room, sender, type, content) do
+  @spec custom_event(Room.t(), Account.t(), String.t(), map()) :: %Event{}
+  def custom_event(room, sender, type, content) do
     %Event{
       Event.new(room, sender)
       | type: type,
         content: content
     }
+  end
+
+  @spec custom_state_event(Room.t(), Account.t(), String.t(), map(), String.t()) :: %Event{}
+  def custom_state_event(room, sender, type, content, state_key) do
+    %Event{custom_event(room, sender, type, content) | state_key: state_key}
   end
 
   @spec is_control_event(t()) :: boolean()

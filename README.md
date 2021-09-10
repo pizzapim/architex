@@ -58,15 +58,16 @@ Here, implemented and some unimplemented features are listed.
 - POST /_matrix/client/r0/rooms/{roomId}/kick
 - POST /_matrix/client/r0/rooms/{roomId}/ban
 - POST /_matrix/client/r0/rooms/{roomId}/unban
+- PUT /_matrix/client/r0/rooms/{roomId}/state/{eventType}/{stateKey}
 - PUT /_matrix/client/r0/rooms/{roomId}/send/{eventType}/{txnId}
 - GET /_matrix/client/r0/rooms/{roomId}/messages: Except filtering.
 - GET /_matrix/client/r0/directory/list/room/{roomId}
 - PUT /_matrix/client/r0/directory/list/room/{roomId}
 - GET /_matrix/client/r0/capabilities
 - GET /_matrix/client/r0/profile/{userId}
-- GET /_matrix/client/r0/profile/{userId}/avatar_url: Except federation.
+- GET /_matrix/client/r0/profile/{userId}/avatar_url
 - PUT /_matrix/client/r0/profile/{userId}/avatar_url
-- GET /_matrix/client/r0/profile/{userId}/displayname: Except federation.
+- GET /_matrix/client/r0/profile/{userId}/displayname
 - PUT /_matrix/client/r0/profile/{userId}/displayname
 
 #### Federation API
