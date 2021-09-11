@@ -9,6 +9,7 @@ defmodule ArchitexWeb.Client.Request.CreateRoom do
           invite: list(String.t()) | nil,
           room_version: String.t() | nil,
           preset: String.t() | nil,
+          is_direct: boolean() | nil,
           power_level_content_override: plco_t() | nil
         }
 
@@ -38,6 +39,7 @@ defmodule ArchitexWeb.Client.Request.CreateRoom do
     field :invite, {:array, :string}
     field :room_version, :string
     field :preset, :string
+    field :is_direct, :boolean
 
     embeds_one :power_level_content_override, PowerLevelContentOverride, primary_key: false do
       field :ban, :integer
@@ -56,7 +58,7 @@ defmodule ArchitexWeb.Client.Request.CreateRoom do
     end
 
     # TODO: unimplemented:
-    # creation_content, initial_state, invite_3pid, initial_state, is_direct
+    # creation_content, initial_state, invite_3pid, initial_state
   end
 
   def changeset(data, params) do
@@ -68,7 +70,8 @@ defmodule ArchitexWeb.Client.Request.CreateRoom do
       :topic,
       :invite,
       :room_version,
-      :preset
+      :preset,
+      :is_direct
     ])
     |> cast_embed(:power_level_content_override,
       with: &power_level_content_override_changeset/2,

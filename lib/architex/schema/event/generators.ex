@@ -180,15 +180,16 @@ end
 defmodule Architex.Event.Invite do
   alias Architex.{Event, Account, Room}
 
-  @spec new(Room.t(), Account.t(), String.t()) :: %Event{}
-  def new(room, sender, user_id) do
+  @spec new(Room.t(), Account.t(), String.t(), boolean() | nil) :: %Event{}
+  def new(room, sender, user_id, is_direct \\ nil) do
+    content = %{"membership" => "invite"}
+    content = if is_direct != nil, do: Map.put(content, "is_direct", is_direct), else: content
+
     %Event{
       Event.new(room, sender)
       | type: "m.room.member",
         state_key: user_id,
-        content: %{
-          "membership" => "invite"
-        }
+        content: content
     }
   end
 end

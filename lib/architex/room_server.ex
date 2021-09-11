@@ -448,9 +448,9 @@ defmodule Architex.RoomServer do
          name: name,
          topic: topic,
          invite: invite,
-         power_level_content_override: power_level_content_override
+         power_level_content_override: power_level_content_override,
+         is_direct: is_direct
        }) do
-
     events =
       ([
          Event.CreateRoom.new(room, account, room_version),
@@ -461,7 +461,7 @@ defmodule Architex.RoomServer do
          [
            if(name, do: Event.Name.new(room, account, name)),
            if(topic, do: Event.Topic.new(room, account, topic))
-         ] ++ room_creation_invite_events(account, invite, room))
+         ] ++ room_creation_invite_events(account, invite, room, is_direct))
       |> Enum.reject(&Kernel.is_nil/1)
 
     fn ->
@@ -528,11 +528,12 @@ defmodule Architex.RoomServer do
   end
 
   # Get the events for room creation for inviting other users.
-  @spec room_creation_invite_events(Account.t(), [String.t()] | nil, Room.t()) :: [%Event{}]
-  defp room_creation_invite_events(_, nil, _), do: []
+  @spec room_creation_invite_events(Account.t(), [String.t()] | nil, Room.t(), boolean() | nil) ::
+          [%Event{}]
+  defp room_creation_invite_events(_, nil, _, _), do: []
 
-  defp room_creation_invite_events(account, invite_user_ids, room) do
-    Enum.map(invite_user_ids, &Event.Invite.new(room, account, &1))
+  defp room_creation_invite_events(account, invite_user_ids, room, is_direct) do
+    Enum.map(invite_user_ids, &Event.Invite.new(room, account, &1, is_direct))
   end
 
   # Finalize the event struct and insert it into the room's state using state resolution.
