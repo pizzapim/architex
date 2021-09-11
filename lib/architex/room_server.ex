@@ -75,8 +75,8 @@ defmodule Architex.RoomServer do
   to the [Matrix documentation](https://matrix.org/docs/spec/client_server/r0.6.1#post-matrix-client-r0-createroom).
   """
   @spec create_room(pid(), Account.t(), CreateRoom.t()) :: {:ok, String.t()} | {:error, atom()}
-  def create_room(pid, account, input) do
-    GenServer.call(pid, {:create_room, account, input})
+  def create_room(pid, account, request) do
+    GenServer.call(pid, {:create_room, account, request})
   end
 
   @doc """
@@ -203,12 +203,12 @@ defmodule Architex.RoomServer do
 
   @impl true
   def handle_call(
-        {:create_room, account, input},
+        {:create_room, account, request},
         _from,
         %{room: %Room{id: room_id} = room} = state
       ) do
-    # TODO: power_level_content_override, initial_state, invite, invite_3pid
-    case Repo.transaction(create_room_insert_events(room, account, input)) do
+    # TODO: power_level_content_override, initial_state, invite_3pid
+    case Repo.transaction(create_room_insert_events(room, account, request)) do
       {:ok, {state_set, room}} ->
         {:reply, {:ok, room_id}, %{state | state_set: state_set, room: room}}
 
@@ -394,7 +394,7 @@ defmodule Architex.RoomServer do
     end
   end
 
-  @spec insert_event_with_txn(t(), Room.t(), Device.t(), %Event{}, String.t()) :: 
+  @spec insert_event_with_txn(t(), Room.t(), Device.t(), %Event{}, String.t()) ::
           (() -> {t(), Room.t(), String.t()} | {:error, atom()})
   defp insert_event_with_txn(
          state_set,
@@ -447,7 +447,8 @@ defmodule Architex.RoomServer do
          room_version: room_version,
          preset: preset,
          name: name,
-         topic: topic
+         topic: topic,
+         invite: invite
        }) do
     events =
       ([
@@ -459,7 +460,7 @@ defmodule Architex.RoomServer do
          [
            if(name, do: Event.Name.new(room, account, name)),
            if(topic, do: Event.Topic.new(room, account, topic))
-         ])
+         ] ++ room_creation_invite_events(account, invite, room))
       |> Enum.reject(&Kernel.is_nil/1)
 
     fn ->
@@ -523,6 +524,14 @@ defmodule Architex.RoomServer do
       Event.HistoryVisibility.new(room, account, his_vis),
       Event.GuestAccess.new(room, account, guest_access)
     ]
+  end
+
+  # Get the events for room creation for inviting other users.
+  @spec room_creation_invite_events(Account.t(), [String.t()] | nil, Room.t()) :: [%Event{}]
+  defp room_creation_invite_events(_, nil, _), do: []
+
+  defp room_creation_invite_events(account, invite_user_ids, room) do
+    Enum.map(invite_user_ids, &Event.Invite.new(room, account, &1))
   end
 
   # Finalize the event struct and insert it into the room's state using state resolution.

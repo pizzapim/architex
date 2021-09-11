@@ -50,7 +50,7 @@ Here, implemented and some unimplemented features are listed.
 - GET /_matrix/client/r0/login
 - POST /_matrix/client/r0/login: Only with password flow.
 - POST /_matrix/client/r0/register: Only with dummy flow.
-- POST /_matrix/client/r0/createRoom: Only with optional parameters name, topic and preset.
+- POST /_matrix/client/r0/createRoom: Only with optional parameters name, topic, preset and invite.
 - GET /_matrix/client/r0/joined_rooms
 - POST /_matrix/client/r0/rooms/{roomId}/invite
 - POST /_matrix/client/r0/rooms/{roomId}/join: Except with third party invite.
