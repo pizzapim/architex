@@ -449,11 +449,12 @@ defmodule Architex.RoomServer do
          topic: topic,
          invite: invite,
          power_level_content_override: power_level_content_override,
-         is_direct: is_direct
+         is_direct: is_direct,
+         creation_content: creation_content
        }) do
     events =
       ([
-         Event.CreateRoom.new(room, account, room_version),
+         Event.CreateRoom.new(room, account, room_version, creation_content),
          Event.Join.new(room, account),
          Event.PowerLevels.create_room_new(room, account, power_level_content_override)
        ] ++

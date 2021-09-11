@@ -19,18 +19,31 @@ end
 defmodule Architex.Event.CreateRoom do
   alias Architex.{Event, Account, Room}
 
-  @spec new(Room.t(), Account.t(), String.t()) :: %Event{}
-  def new(room, %Account{localpart: localpart} = creator, room_version) do
+  @clobber_content_keys ["creator", "room_version"]
+
+  @spec new(Room.t(), Account.t(), String.t(), %{optional(String.t()) => any()} | nil) :: %Event{}
+  def new(room, %Account{localpart: localpart} = creator, room_version, creation_content) do
     mxid = Architex.get_mxid(localpart)
+
+    content = %{
+      "creator" => mxid,
+      "room_version" => room_version || Architex.default_room_version()
+    }
+
+    content =
+      if creation_content do
+        creation_content
+        |> Map.drop(@clobber_content_keys)
+        |> Map.merge(content)
+      else
+        content
+      end
 
     %Event{
       Event.new(room, creator)
       | type: "m.room.create",
         state_key: "",
-        content: %{
-          "creator" => mxid,
-          "room_version" => room_version || Architex.default_room_version()
-        }
+        content: content
     }
   end
 end

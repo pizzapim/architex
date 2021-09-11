@@ -50,7 +50,7 @@ Here, implemented and some unimplemented features are listed.
 - GET /_matrix/client/r0/login
 - POST /_matrix/client/r0/login: Only with password flow.
 - POST /_matrix/client/r0/register: Only with dummy flow.
-- POST /_matrix/client/r0/createRoom: Except creation_content, initial_state, invite_3pid and initial_state.
+- POST /_matrix/client/r0/createRoom: Except with options invite_3pid, initial_state and room_alias_name.
 - GET /_matrix/client/r0/joined_rooms
 - POST /_matrix/client/r0/rooms/{roomId}/invite
 - POST /_matrix/client/r0/rooms/{roomId}/join: Except with third party invite.
