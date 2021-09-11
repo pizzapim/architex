@@ -207,7 +207,6 @@ defmodule Architex.RoomServer do
         _from,
         %{room: %Room{id: room_id} = room} = state
       ) do
-    # TODO: power_level_content_override, initial_state, invite_3pid
     case Repo.transaction(create_room_insert_events(room, account, request)) do
       {:ok, {state_set, room}} ->
         {:reply, {:ok, room_id}, %{state | state_set: state_set, room: room}}
@@ -448,13 +447,15 @@ defmodule Architex.RoomServer do
          preset: preset,
          name: name,
          topic: topic,
-         invite: invite
+         invite: invite,
+         power_level_content_override: power_level_content_override
        }) do
+
     events =
       ([
          Event.CreateRoom.new(room, account, room_version),
          Event.Join.new(room, account),
-         Event.PowerLevels.new(room, account)
+         Event.PowerLevels.create_room_new(room, account, power_level_content_override)
        ] ++
          room_creation_preset(account, preset, room) ++
          [

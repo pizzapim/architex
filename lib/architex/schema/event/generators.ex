@@ -37,30 +37,61 @@ end
 
 defmodule Architex.Event.PowerLevels do
   alias Architex.{Event, Account, Room}
+  alias ArchitexWeb.Client.Request.CreateRoom
+  alias ArchitexWeb.Client.Request.CreateRoom.PowerLevelContentOverride
 
-  @spec new(Room.t(), Account.t()) :: %Event{}
-  def new(room, %Account{localpart: localpart} = sender) do
+  @ban 50
+  @events_default 0
+  @invite 50
+  @kick 50
+  @redact 50
+  @state_default 50
+  @creator 50
+  @users_default 0
+  @notifications_room 50
+
+  @spec create_room_new(Room.t(), Account.t(), CreateRoom.plco_t()) :: %Event{}
+  def create_room_new(room, sender, nil) do
+    create_room_new(room, sender, %PowerLevelContentOverride{})
+  end
+
+  def create_room_new(room, %Account{localpart: localpart} = sender, %PowerLevelContentOverride{
+        ban: ban_override,
+        events: events_override,
+        events_default: events_default_override,
+        invite: invite_override,
+        kick: kick_override,
+        redact: redact_override,
+        state_default: state_default_override,
+        users: users_override,
+        users_default: users_default_override,
+        notifications: notifications_override
+      }) do
     mxid = Architex.get_mxid(localpart)
+    users = %{mxid => @creator}
+    users = if users_override, do: Map.merge(users, users_override), else: users
+
+    notifications =
+      case notifications_override do
+        %{room: room} -> %{"room" => room}
+        _ -> %{"room" => @notifications_room}
+      end
 
     %Event{
       Event.new(room, sender)
       | type: "m.room.power_levels",
         state_key: "",
         content: %{
-          "ban" => 50,
-          "events" => %{},
-          "events_default" => 0,
-          "invite" => 50,
-          "kick" => 50,
-          "redact" => 50,
-          "state_default" => 50,
-          "users" => %{
-            mxid => 50
-          },
-          "users_default" => 0,
-          "notifications" => %{
-            "room" => 50
-          }
+          "ban" => ban_override || @ban,
+          "events" => events_override || %{},
+          "events_default" => events_default_override || @events_default,
+          "invite" => invite_override || @invite,
+          "kick" => kick_override || @kick,
+          "redact" => redact_override || @redact,
+          "state_default" => state_default_override || @state_default,
+          "users" => users,
+          "users_default" => users_default_override || @users_default,
+          "notifications" => notifications
         }
     }
   end
