@@ -456,7 +456,13 @@ defmodule Architex.RoomServer do
       ([
          Event.CreateRoom.new(room, account, room_version, creation_content),
          Event.Join.new(room, account),
-         Event.PowerLevels.create_room_new(room, account, power_level_content_override)
+         Event.PowerLevels.create_room_new(
+           room,
+           account,
+           power_level_content_override,
+           invite,
+           preset
+         )
        ] ++
          room_creation_preset(account, preset, room) ++
          [
@@ -500,8 +506,6 @@ defmodule Architex.RoomServer do
   end
 
   # Get the events for room creation as dictated by the given preset.
-  # TODO: trusted_private_chat:
-  #       All invitees are given the same power level as the room creator.
   @spec room_creation_preset(Account.t(), String.t() | nil, Room.t()) :: [%Event{}]
   defp room_creation_preset(account, nil, %Room{visibility: visibility} = room) do
     preset =

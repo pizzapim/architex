@@ -63,26 +63,49 @@ defmodule Architex.Event.PowerLevels do
   @users_default 0
   @notifications_room 50
 
-  @spec create_room_new(Room.t(), Account.t(), CreateRoom.plco_t()) :: %Event{}
-  def create_room_new(room, sender, nil) do
-    create_room_new(room, sender, %PowerLevelContentOverride{})
+  @spec create_room_new(
+          Room.t(),
+          Account.t(),
+          CreateRoom.plco_t(),
+          [String.t()] | nil,
+          String.t() | nil
+        ) :: %Event{}
+  def create_room_new(room, sender, nil, invite_ids, preset) do
+    create_room_new(room, sender, %PowerLevelContentOverride{}, invite_ids, preset)
   end
 
-  def create_room_new(room, %Account{localpart: localpart} = sender, %PowerLevelContentOverride{
-        ban: ban_override,
-        events: events_override,
-        events_default: events_default_override,
-        invite: invite_override,
-        kick: kick_override,
-        redact: redact_override,
-        state_default: state_default_override,
-        users: users_override,
-        users_default: users_default_override,
-        notifications: notifications_override
-      }) do
+  def create_room_new(
+        room,
+        %Account{localpart: localpart} = sender,
+        %PowerLevelContentOverride{
+          ban: ban_override,
+          events: events_override,
+          events_default: events_default_override,
+          invite: invite_override,
+          kick: kick_override,
+          redact: redact_override,
+          state_default: state_default_override,
+          users: users_override,
+          users_default: users_default_override,
+          notifications: notifications_override
+        },
+        invite_ids,
+        preset
+      ) do
     mxid = Architex.get_mxid(localpart)
     users = %{mxid => @creator}
     users = if users_override, do: Map.merge(users, users_override), else: users
+    creator_pl = users[mxid]
+
+    # Give each invitee the same power level as the creator.
+    # This overrides the content override, but the spec is not clear on this.
+    users =
+      if preset == "trusted_private_chat" and invite_ids do
+        invite_users_pls = Enum.into(invite_ids, %{}, &{&1, creator_pl})
+        Map.merge(users, invite_users_pls)
+      else
+        users
+      end
 
     notifications =
       case notifications_override do
