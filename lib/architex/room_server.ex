@@ -450,26 +450,49 @@ defmodule Architex.RoomServer do
          invite: invite,
          power_level_content_override: power_level_content_override,
          is_direct: is_direct,
-         creation_content: creation_content
+         creation_content: creation_content,
+         initial_state: initial_state
        }) do
+    invite_events = room_creation_invite_events(account, invite, room, is_direct)
+
+    name_and_topic_events =
+      Enum.reject(
+        [
+          if(name, do: Event.Name.new(room, account, name)),
+          if(topic, do: Event.Topic.new(room, account, topic))
+        ],
+        &Kernel.is_nil/1
+      )
+
+    initial_state_pairs =
+      if initial_state, do: Enum.map(initial_state, &{&1.type, &1.state_key}), else: []
+
+    initial_state_events =
+      room_creation_initial_state_events(account, initial_state, room)
+      |> Enum.reject(fn %Event{type: type, state_key: state_key} ->
+        ({type, state_key} == {"m.room.name", ""} and name) ||
+          ({type, state_key} == {"m.room.topic", ""} and topic)
+      end)
+
+    preset_events =
+      room_creation_preset(account, preset, room)
+      |> Enum.reject(&({&1.type, &1.state_key} in initial_state_pairs))
+
+    basic_events = [
+      Event.CreateRoom.new(room, account, room_version, creation_content),
+      Event.Join.new(room, account),
+      Event.PowerLevels.create_room_new(
+        room,
+        account,
+        power_level_content_override,
+        invite,
+        preset
+      )
+    ]
+
     events =
-      ([
-         Event.CreateRoom.new(room, account, room_version, creation_content),
-         Event.Join.new(room, account),
-         Event.PowerLevels.create_room_new(
-           room,
-           account,
-           power_level_content_override,
-           invite,
-           preset
-         )
-       ] ++
-         room_creation_preset(account, preset, room) ++
-         [
-           if(name, do: Event.Name.new(room, account, name)),
-           if(topic, do: Event.Topic.new(room, account, topic))
-         ] ++ room_creation_invite_events(account, invite, room, is_direct))
-      |> Enum.reject(&Kernel.is_nil/1)
+      basic_events ++
+        preset_events ++ initial_state_events ++ name_and_topic_events ++ invite_events
 
     fn ->
       result =
@@ -539,6 +562,14 @@ defmodule Architex.RoomServer do
 
   defp room_creation_invite_events(account, invite_user_ids, room, is_direct) do
     Enum.map(invite_user_ids, &Event.Invite.new(room, account, &1, is_direct))
+  end
+
+  defp room_creation_initial_state_events(_, nil, _), do: []
+
+  defp room_creation_initial_state_events(account, initial_state, room) do
+    Enum.map(initial_state, fn %{type: type, content: content, state_key: state_key} ->
+      Event.custom_state_event(room, account, type, content, state_key)
+    end)
   end
 
   # Finalize the event struct and insert it into the room's state using state resolution.

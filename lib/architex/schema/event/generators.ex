@@ -66,7 +66,7 @@ defmodule Architex.Event.PowerLevels do
   @spec create_room_new(
           Room.t(),
           Account.t(),
-          CreateRoom.plco_t(),
+          CreateRoom.PowerLevelContentOverride.t(),
           [String.t()] | nil,
           String.t() | nil
         ) :: %Event{}
