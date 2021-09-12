@@ -6,13 +6,18 @@ defmodule Architex.Alias do
   alias Architex.{Repo, Alias, Room}
   alias Ecto.Changeset
 
+  @type t :: %__MODULE__{
+          alias: String.t(),
+          room_id: String.t()
+        }
+
   @primary_key {:alias, :string, []}
   schema "aliases" do
     belongs_to :room, Room, foreign_key: :room_id, references: :id, type: :string
   end
 
-  def create(alias, room_id) do
-    change(%Alias{}, alias: alias, room_id: room_id)
+  def create(alias_, room_id) do
+    change(%Alias{}, alias: alias_, room_id: room_id)
     |> assoc_constraint(:room)
     |> unique_constraint(:alias, name: :aliases_pkey)
     |> Repo.insert()

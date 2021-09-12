@@ -21,7 +21,8 @@ defmodule Architex.RoomServer do
     Account,
     Device,
     DeviceTransaction,
-    Membership
+    Membership,
+    Alias
   }
 
   alias Architex.StateResolution.Authorization
@@ -203,19 +204,34 @@ defmodule Architex.RoomServer do
 
   @impl true
   def handle_call(
-        {:create_room, account, request},
+        {:create_room, account, %CreateRoom{room_alias_name: room_alias_name} = request},
         _from,
         %{room: %Room{id: room_id} = room} = state
       ) do
-    case Repo.transaction(create_room_insert_events(room, account, request)) do
-      {:ok, {state_set, room}} ->
-        {:reply, {:ok, room_id}, %{state | state_set: state_set, room: room}}
+    create_alias_result =
+      if room_alias_name do
+        Alias.create(room_alias_name, room_id)
+      else
+        {:ok, nil}
+      end
 
-      {:error, reason} ->
-        {:reply, {:error, reason}, state}
+    case create_alias_result do
+      {:ok, alias_} ->
+        events = create_room_events(room, account, request, alias_)
 
-      _ ->
-        {:reply, {:error, :unknown}, state}
+        case Repo.transaction(process_events(room, %{}, events)) do
+          {:ok, {state_set, room}} ->
+            {:reply, {:ok, room_id}, %{state | state_set: state_set, room: room}}
+
+          {:error, reason} ->
+            {:reply, {:error, reason}, state}
+
+          _ ->
+            {:reply, {:error, :unknown}, state}
+        end
+
+      {:error, _} ->
+        {:reply, {:error, :alias}, state}
     end
   end
 
@@ -275,7 +291,7 @@ defmodule Architex.RoomServer do
   def handle_call({:invite, account, user_id}, _from, %{room: room, state_set: state_set} = state) do
     invite_event = Event.Invite.new(room, account, user_id)
 
-    case Repo.transaction(insert_single_event(room, state_set, invite_event)) do
+    case Repo.transaction(process_event(room, state_set, invite_event)) do
       {:ok, {state_set, room, _}} -> {:reply, :ok, %{state | state_set: state_set, room: room}}
       {:error, reason} -> {:reply, {:error, reason}, state}
     end
@@ -288,7 +304,7 @@ defmodule Architex.RoomServer do
       ) do
     join_event = Event.Join.new(room, account)
 
-    case Repo.transaction(insert_single_event(room, state_set, join_event)) do
+    case Repo.transaction(process_event(room, state_set, join_event)) do
       {:ok, {state_set, room, _}} ->
         {:reply, {:ok, room_id}, %{state | state_set: state_set, room: room}}
 
@@ -300,7 +316,7 @@ defmodule Architex.RoomServer do
   def handle_call({:leave, account}, _from, %{room: room, state_set: state_set} = state) do
     leave_event = Event.Leave.new(room, account)
 
-    case Repo.transaction(insert_single_event(room, state_set, leave_event)) do
+    case Repo.transaction(process_event(room, state_set, leave_event)) do
       {:ok, {state_set, room, _}} -> {:reply, :ok, %{state | state_set: state_set, room: room}}
       {:error, reason} -> {:reply, {:error, reason}, state}
     end
@@ -313,7 +329,7 @@ defmodule Architex.RoomServer do
       ) do
     kick_event = Event.Kick.new(room, account, user_id, reason)
 
-    case Repo.transaction(insert_single_event(room, state_set, kick_event)) do
+    case Repo.transaction(process_event(room, state_set, kick_event)) do
       {:ok, {state_set, room, _}} -> {:reply, :ok, %{state | state_set: state_set, room: room}}
       {:error, reason} -> {:reply, {:error, reason}, state}
     end
@@ -326,7 +342,7 @@ defmodule Architex.RoomServer do
       ) do
     ban_event = Event.Ban.new(room, account, user_id, reason)
 
-    case Repo.transaction(insert_single_event(room, state_set, ban_event)) do
+    case Repo.transaction(process_event(room, state_set, ban_event)) do
       {:ok, {state_set, room, _}} -> {:reply, :ok, %{state | state_set: state_set, room: room}}
       {:error, reason} -> {:reply, {:error, reason}, state}
     end
@@ -335,7 +351,7 @@ defmodule Architex.RoomServer do
   def handle_call({:unban, account, user_id}, _from, %{room: room, state_set: state_set} = state) do
     unban_event = Event.Unban.new(room, account, user_id)
 
-    case Repo.transaction(insert_single_event(room, state_set, unban_event)) do
+    case Repo.transaction(process_event(room, state_set, unban_event)) do
       {:ok, {state_set, room, _}} -> {:reply, :ok, %{state | state_set: state_set, room: room}}
       {:error, reason} -> {:reply, {:error, reason}, state}
     end
@@ -368,7 +384,7 @@ defmodule Architex.RoomServer do
       ) do
     message_event = Event.custom_event(room, account, event_type, content)
 
-    case Repo.transaction(insert_event_with_txn(state_set, room, device, message_event, txn_id)) do
+    case Repo.transaction(process_event_with_txn(state_set, room, device, message_event, txn_id)) do
       {:ok, {state_set, room, event_id}} ->
         {:reply, {:ok, event_id}, %{state | state_set: state_set, room: room}}
 
@@ -384,7 +400,7 @@ defmodule Architex.RoomServer do
       ) do
     state_event = Event.custom_state_event(room, account, event_type, content, state_key)
 
-    case Repo.transaction(insert_single_event(room, state_set, state_event)) do
+    case Repo.transaction(process_event(room, state_set, state_event)) do
       {:ok, {state_set, room, %Event{id: event_id}}} ->
         {:reply, {:ok, event_id}, %{state | state_set: state_set, room: room}}
 
@@ -393,9 +409,9 @@ defmodule Architex.RoomServer do
     end
   end
 
-  @spec insert_event_with_txn(t(), Room.t(), Device.t(), %Event{}, String.t()) ::
+  @spec process_event_with_txn(t(), Room.t(), Device.t(), %Event{}, String.t()) ::
           (() -> {t(), Room.t(), String.t()} | {:error, atom()})
-  defp insert_event_with_txn(
+  defp process_event_with_txn(
          state_set,
          room,
          %Device{nid: device_nid} = device,
@@ -413,7 +429,7 @@ defmodule Architex.RoomServer do
 
         nil ->
           with {state_set, room, %Event{id: event_id}} <-
-                 insert_single_event(room, state_set, message_event).() do
+                 process_event(room, state_set, message_event).() do
             # Mark this transaction as done.
             Ecto.build_assoc(device, :device_transactions, txn_id: txn_id, event_id: event_id)
             |> Repo.insert!()
@@ -424,11 +440,11 @@ defmodule Architex.RoomServer do
     end
   end
 
-  @spec insert_single_event(Room.t(), t(), %Event{}) ::
+  @spec process_event(Room.t(), t(), %Event{}) ::
           (() -> {t(), Room.t(), Event.t()} | {:error, atom()})
-  defp insert_single_event(room, state_set, event) do
+  defp process_event(room, state_set, event) do
     fn ->
-      case finalize_and_insert_event(event, state_set, room) do
+      case finalize_and_process_event(event, state_set, room) do
         {:ok, state_set, room, event} ->
           _ = update_room_state_set(room, state_set)
           {state_set, room, event}
@@ -439,27 +455,53 @@ defmodule Architex.RoomServer do
     end
   end
 
-  # Get a function that inserts all events for room creation.
-  @spec create_room_insert_events(Room.t(), Account.t(), CreateRoom.t()) ::
-          (() -> {:ok, t(), Room.t()} | {:error, atom()})
-  defp create_room_insert_events(room, account, %CreateRoom{
-         room_version: room_version,
-         preset: preset,
-         name: name,
-         topic: topic,
-         invite: invite,
-         power_level_content_override: power_level_content_override,
-         is_direct: is_direct,
-         creation_content: creation_content,
-         initial_state: initial_state
-       }) do
+  @spec process_events(Room.t(), t(), [%Event{}]) ::
+          (() -> {t(), Room.t()} | {:error, atom()})
+  defp process_events(room, state_set, events) do
+    fn ->
+      Enum.reduce_while(events, {state_set, room}, fn event, {state_set, room} ->
+        case finalize_and_process_event(event, state_set, room) do
+          {:ok, state_set, room, _} -> {:cont, {state_set, room}}
+          {:error, reason} -> {:halt, {:error, reason}}
+        end
+      end)
+      |> then(fn
+        {:error, reason} ->
+          Repo.rollback(reason)
+
+        {state_set, room} ->
+          _ = update_room_state_set(room, state_set)
+          {state_set, room}
+      end)
+    end
+  end
+
+  @spec create_room_events(Room.t(), Account.t(), CreateRoom.t(), Alias.t() | nil) :: [%Event{}]
+  defp create_room_events(
+         room,
+         account,
+         %CreateRoom{
+           room_version: room_version,
+           preset: preset,
+           name: name,
+           topic: topic,
+           invite: invite,
+           power_level_content_override: power_level_content_override,
+           is_direct: is_direct,
+           creation_content: creation_content,
+           initial_state: initial_state
+         },
+         alias_
+       ) do
     invite_events = room_creation_invite_events(account, invite, room, is_direct)
 
+    # Spec doesn't specify where to insert canonical_alias event, do it after topic event.
     name_and_topic_events =
       Enum.reject(
         [
           if(name, do: Event.Name.new(room, account, name)),
-          if(topic, do: Event.Topic.new(room, account, topic))
+          if(topic, do: Event.Topic.new(room, account, topic)),
+          if(alias_, do: Event.CanonicalAlias.new(room, account, alias_.alias))
         ],
         &Kernel.is_nil/1
       )
@@ -490,28 +532,8 @@ defmodule Architex.RoomServer do
       )
     ]
 
-    events =
-      basic_events ++
-        preset_events ++ initial_state_events ++ name_and_topic_events ++ invite_events
-
-    fn ->
-      result =
-        Enum.reduce_while(events, {%{}, room}, fn event, {state_set, room} ->
-          case finalize_and_insert_event(event, state_set, room) do
-            {:ok, state_set, room, _} -> {:cont, {state_set, room}}
-            {:error, reason} -> {:halt, {:error, reason}}
-          end
-        end)
-
-      case result do
-        {:error, reason} ->
-          Repo.rollback(reason)
-
-        {state_set, room} ->
-          _ = update_room_state_set(room, state_set)
-          {state_set, room}
-      end
-    end
+    basic_events ++
+      preset_events ++ initial_state_events ++ name_and_topic_events ++ invite_events
   end
 
   # Update the given room in the database with the given state set.
@@ -579,9 +601,9 @@ defmodule Architex.RoomServer do
   # - Content hash
   # - Event ID
   # - Signature
-  @spec finalize_and_insert_event(%Event{}, t(), Room.t()) ::
+  @spec finalize_and_process_event(%Event{}, t(), Room.t()) ::
           {:ok, t(), Room.t(), Event.t()} | {:error, atom()}
-  defp finalize_and_insert_event(
+  defp finalize_and_process_event(
          event,
          state_set,
          %Room{forward_extremities: forward_extremities} = room
@@ -593,7 +615,7 @@ defmodule Architex.RoomServer do
       |> Map.put(:depth, get_depth(forward_extremities))
 
     case Event.post_process(event) do
-      {:ok, event} -> authenticate_and_insert_event(event, state_set, room)
+      {:ok, event} -> authenticate_and_process_event(event, state_set, room)
       _ -> {:error, :event_creation}
     end
   end
@@ -660,9 +682,9 @@ defmodule Architex.RoomServer do
   # Authenticate and insert a new event using state resolution.
   # Implements the checks as described in the
   # [Matrix docs](https://matrix.org/docs/spec/server_server/latest#checks-performed-on-receipt-of-a-pdu).
-  @spec authenticate_and_insert_event(Event.t(), t(), Room.t()) ::
+  @spec authenticate_and_process_event(Event.t(), t(), Room.t()) ::
           {:ok, t(), Room.t(), Event.t()} | {:error, atom()}
-  defp authenticate_and_insert_event(event, current_state_set, room) do
+  defp authenticate_and_process_event(event, current_state_set, room) do
     # TODO: Correctly handle soft fails.
     # Check the following things:
     # 1. TODO: Is a valid event, otherwise it is dropped.

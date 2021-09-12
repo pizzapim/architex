@@ -282,6 +282,7 @@ end
 
 defmodule Architex.Event.Unban do
   alias Architex.{Event, Account, Room}
+
   @spec new(Room.t(), Account.t(), String.t()) :: %Event{}
   def new(room, sender, user_id) do
     %Event{
@@ -291,6 +292,24 @@ defmodule Architex.Event.Unban do
         content: %{
           "membership" => "leave"
         }
+    }
+  end
+end
+
+defmodule Architex.Event.CanonicalAlias do
+  alias Architex.{Event, Account, Room}
+
+  @spec new(Room.t(), Account.t(), String.t() | nil, [String.t()] | nil) :: %Event{}
+  def new(room, sender, alias_ \\ nil, alt_aliases \\ nil) do
+    content = %{}
+    content = if alias_, do: Map.put(content, "alias", alias_), else: content
+    content = if alt_aliases, do: Map.put(content, "alt_aliases", alt_aliases), else: content
+
+    %Event{
+      Event.new(room, sender)
+      | type: "m.room.canonical_alias",
+        state_key: "",
+        content: content
     }
   end
 end

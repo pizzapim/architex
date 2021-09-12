@@ -14,6 +14,7 @@ defmodule ArchitexWeb.Error do
     unauthorized: {400, "M_UNAUTHORIZED", "The request was unauthorized."},
     invalid_param: {400, "M_INVALID_PARAM", "A request parameter was invalid."},
     missing_param: {400, "M_MISSING_PARAM", "A request parameter is missing."},
+    room_in_use: {400, "M_ROOM_IN_USE", "The room is already in use."},
     unknown_token: {401, "M_UNKNOWN_TOKEN", "Invalid access token."},
     missing_token: {401, "M_MISSING_TOKEN", "Access token required."},
     not_found: {404, "M_NOT_FOUND", "The requested resource was not found."},

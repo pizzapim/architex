@@ -25,6 +25,9 @@ defmodule ArchitexWeb.Client.RoomController do
         {:error, :authorization} ->
           put_error(conn, :invalid_room_state)
 
+        {:error, :alias} ->
+          put_error(conn, :room_in_use, "The requested alias is already in use.")
+
         {:error, :unknown} ->
           put_error(conn, :unknown)
       end
