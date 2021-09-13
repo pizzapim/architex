@@ -25,6 +25,8 @@ defmodule Architex.RoomServer do
     Alias
   }
 
+  alias Architex.Types.UserId
+
   alias Architex.StateResolution.Authorization
   alias ArchitexWeb.Client.Request.{CreateRoom, Kick, Ban}
 
@@ -112,9 +114,10 @@ defmodule Architex.RoomServer do
   @doc """
   Invite the a user to this room.
   """
-  @spec invite(pid(), Account.t(), String.t()) :: :ok | {:error, atom()}
-  def invite(pid, account, user_id) do
-    GenServer.call(pid, {:invite, account, user_id})
+  @spec invite(pid(), Account.t(), String.t(), String.t() | nil, String.t() | nil) ::
+          :ok | {:error, atom()}
+  def invite(pid, account, user_id, avatar_url, displayname) do
+    GenServer.call(pid, {:invite, account, user_id, avatar_url, displayname})
   end
 
   @doc """
@@ -136,25 +139,28 @@ defmodule Architex.RoomServer do
   @doc """
   Kick a user from this room.
   """
-  @spec kick(pid(), Account.t(), Kick.t()) :: :ok | {:error, atom()}
-  def kick(pid, account, request) do
-    GenServer.call(pid, {:kick, account, request})
+  @spec kick(pid(), Account.t(), Kick.t(), String.t() | nil, String.t() | nil) ::
+          :ok | {:error, atom()}
+  def kick(pid, account, request, avatar_url, displayname) do
+    GenServer.call(pid, {:kick, account, request, avatar_url, displayname})
   end
 
   @doc """
   Ban a user from this room.
   """
-  @spec ban(pid(), Account.t(), Ban.t()) :: :ok | {:error, atom()}
-  def ban(pid, account, request) do
-    GenServer.call(pid, {:ban, account, request})
+  @spec ban(pid(), Account.t(), Ban.t(), String.t() | nil, String.t() | nil) ::
+          :ok | {:error, atom()}
+  def ban(pid, account, request, avatar_url, displayname) do
+    GenServer.call(pid, {:ban, account, request, avatar_url, displayname})
   end
 
   @doc """
   Unban a user from this room.
   """
-  @spec unban(pid(), Account.t(), String.t()) :: :ok | {:error, atom()}
-  def unban(pid, account, user_id) do
-    GenServer.call(pid, {:unban, account, user_id})
+  @spec unban(pid(), Account.t(), String.t(), String.t() | nil, String.t() | nil) ::
+          :ok | {:error, atom()}
+  def unban(pid, account, user_id, avatar_url, displayname) do
+    GenServer.call(pid, {:unban, account, user_id, avatar_url, displayname})
   end
 
   @doc """
@@ -288,8 +294,12 @@ defmodule Architex.RoomServer do
     {:reply, {state_events, auth_chain}, state}
   end
 
-  def handle_call({:invite, account, user_id}, _from, %{room: room, state_set: state_set} = state) do
-    invite_event = Event.Invite.new(room, account, user_id)
+  def handle_call(
+        {:invite, account, user_id, avatar_url, displayname},
+        _from,
+        %{room: room, state_set: state_set} = state
+      ) do
+    invite_event = Event.Invite.new(room, account, user_id, avatar_url, displayname)
 
     case Repo.transaction(process_event(room, state_set, invite_event)) do
       {:ok, {state_set, room, _}} -> {:reply, :ok, %{state | state_set: state_set, room: room}}
@@ -323,11 +333,12 @@ defmodule Architex.RoomServer do
   end
 
   def handle_call(
-        {:kick, account, %Kick{user_id: user_id, reason: reason}},
+        {:kick, account, %Kick{user_id: user_id, reason: reason}, avatar_url, displayname},
         _from,
         %{room: room, state_set: state_set} = state
       ) do
-    kick_event = Event.Kick.new(room, account, user_id, reason)
+    kick_event =
+      Event.Kick.new(room, account, to_string(user_id), avatar_url, displayname, reason)
 
     case Repo.transaction(process_event(room, state_set, kick_event)) do
       {:ok, {state_set, room, _}} -> {:reply, :ok, %{state | state_set: state_set, room: room}}
@@ -336,11 +347,11 @@ defmodule Architex.RoomServer do
   end
 
   def handle_call(
-        {:ban, account, %Kick{user_id: user_id, reason: reason}},
+        {:ban, account, %Ban{user_id: user_id, reason: reason}, avatar_url, displayname},
         _from,
         %{room: room, state_set: state_set} = state
       ) do
-    ban_event = Event.Ban.new(room, account, user_id, reason)
+    ban_event = Event.Ban.new(room, account, to_string(user_id), avatar_url, displayname, reason)
 
     case Repo.transaction(process_event(room, state_set, ban_event)) do
       {:ok, {state_set, room, _}} -> {:reply, :ok, %{state | state_set: state_set, room: room}}
@@ -348,8 +359,12 @@ defmodule Architex.RoomServer do
     end
   end
 
-  def handle_call({:unban, account, user_id}, _from, %{room: room, state_set: state_set} = state) do
-    unban_event = Event.Unban.new(room, account, user_id)
+  def handle_call(
+        {:unban, account, user_id, avatar_url, displayname},
+        _from,
+        %{room: room, state_set: state_set} = state
+      ) do
+    unban_event = Event.Unban.new(room, account, user_id, avatar_url, displayname)
 
     case Repo.transaction(process_event(room, state_set, unban_event)) do
       {:ok, {state_set, room, _}} -> {:reply, :ok, %{state | state_set: state_set, room: room}}
@@ -578,12 +593,16 @@ defmodule Architex.RoomServer do
   end
 
   # Get the events for room creation for inviting other users.
-  @spec room_creation_invite_events(Account.t(), [String.t()] | nil, Room.t(), boolean() | nil) ::
+  @spec room_creation_invite_events(Account.t(), [UserId.t()] | nil, Room.t(), boolean() | nil) ::
           [%Event{}]
   defp room_creation_invite_events(_, nil, _, _), do: []
 
   defp room_creation_invite_events(account, invite_user_ids, room, is_direct) do
-    Enum.map(invite_user_ids, &Event.Invite.new(room, account, &1, is_direct))
+    Enum.map(invite_user_ids, fn user_id ->
+      {avatar_url, displayname} = UserId.try_get_user_information(user_id)
+
+      Event.Invite.new(room, account, to_string(user_id), avatar_url, displayname, is_direct)
+    end)
   end
 
   defp room_creation_initial_state_events(_, nil, _), do: []

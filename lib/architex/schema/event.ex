@@ -314,4 +314,15 @@ defmodule Architex.Event do
       {:ok, :crypto.hash(:sha256, json)}
     end
   end
+
+  @spec default_membership_content(String.t() | nil, String.t() | nil) :: %{
+          optional(String.t()) => String.t()
+        }
+  def default_membership_content(avatar_url, displayname) do
+    content = %{}
+    content = if avatar_url, do: Map.put(content, "avatar_url", avatar_url), else: content
+    content = if displayname, do: Map.put(content, "displayname", displayname), else: content
+
+    content
+  end
 end

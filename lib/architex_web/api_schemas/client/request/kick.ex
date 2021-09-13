@@ -1,14 +1,16 @@
 defmodule ArchitexWeb.Client.Request.Kick do
   use ArchitexWeb.APIRequest
 
+  alias Architex.Types.UserId
+
   @type t :: %__MODULE__{
-          user_id: String.t(),
+          user_id: UserId.t(),
           reason: String.t() | nil
         }
 
   @primary_key false
   embedded_schema do
-    field :user_id, :string
+    field :user_id, UserId
     field :reason, :string
   end
 

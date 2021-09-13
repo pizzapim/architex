@@ -63,9 +63,11 @@ defmodule ArchitexWeb.Client.RoomController do
         "room_id" => room_id,
         "user_id" => user_id
       }) do
-    with {:ok, _} <- UserId.cast(user_id),
+    with {:ok, user_id_struct} <- UserId.cast(user_id),
          {:ok, pid} <- RoomServer.get_room_server(room_id) do
-      case RoomServer.invite(pid, account, user_id) do
+      {avatar_url, displayname} = UserId.try_get_user_information(user_id_struct)
+
+      case RoomServer.invite(pid, account, user_id, avatar_url, displayname) do
         :ok ->
           conn
           |> send_resp(200, [])
@@ -135,9 +137,11 @@ defmodule ArchitexWeb.Client.RoomController do
   Action for POST /_matrix/client/r0/rooms/{roomId}/kick.
   """
   def kick(%Conn{assigns: %{account: account}} = conn, %{"room_id" => room_id} = params) do
-    with {:ok, request} <- Kick.parse(params),
+    with {:ok, %Kick{user_id: user_id} = request} <- Kick.parse(params),
          {:ok, pid} <- RoomServer.get_room_server(room_id) do
-      case RoomServer.kick(pid, account, request) do
+      {avatar_url, displayname} = UserId.try_get_user_information(user_id)
+
+      case RoomServer.kick(pid, account, request, avatar_url, displayname) do
         :ok ->
           conn
           |> send_resp(200, [])
@@ -158,9 +162,11 @@ defmodule ArchitexWeb.Client.RoomController do
   Action for POST /_matrix/client/r0/rooms/{roomId}/ban.
   """
   def ban(%Conn{assigns: %{account: account}} = conn, %{"room_id" => room_id} = params) do
-    with {:ok, request} <- Ban.parse(params),
+    with {:ok, %Ban{user_id: user_id} = request} <- Ban.parse(params),
          {:ok, pid} <- RoomServer.get_room_server(room_id) do
-      case RoomServer.ban(pid, account, request) do
+      {avatar_url, displayname} = UserId.try_get_user_information(user_id)
+
+      case RoomServer.ban(pid, account, request, avatar_url, displayname) do
         :ok ->
           conn
           |> send_resp(200, [])
@@ -184,20 +190,22 @@ defmodule ArchitexWeb.Client.RoomController do
         "room_id" => room_id,
         "user_id" => user_id
       }) do
-    case RoomServer.get_room_server(room_id) do
-      {:ok, pid} ->
-        case RoomServer.unban(pid, account, user_id) do
-          :ok ->
-            conn
-            |> send_resp(200, [])
-            |> halt()
+    with {:ok, user_id_struct} <- UserId.cast(user_id),
+         {:ok, pid} <- RoomServer.get_room_server(room_id) do
+      {avatar_url, displayname} = UserId.try_get_user_information(user_id_struct)
 
-          {:error, _} ->
-            put_error(conn, :unknown)
-        end
+      case RoomServer.unban(pid, account, user_id, avatar_url, displayname) do
+        :ok ->
+          conn
+          |> send_resp(200, [])
+          |> halt()
 
-      {:error, :not_found} ->
-        put_error(conn, :not_found, "The given room was not found.")
+        {:error, _} ->
+          put_error(conn, :unknown)
+      end
+    else
+      :error -> put_error(conn, :invalid_param, "Given user ID is invalid.")
+      {:error, :not_found} -> put_error(conn, :not_found, "The given room was not found.")
     end
   end
 

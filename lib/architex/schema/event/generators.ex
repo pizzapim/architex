@@ -2,16 +2,21 @@ defmodule Architex.Event.Join do
   alias Architex.{Event, Account, Room}
 
   @spec new(Room.t(), Account.t()) :: %Event{}
-  def new(room, %Account{localpart: localpart} = sender) do
+  def new(
+        room,
+        %Account{localpart: localpart, avatar_url: avatar_url, displayname: displayname} = sender
+      ) do
     mxid = Architex.get_mxid(localpart)
+
+    content =
+      Event.default_membership_content(avatar_url, displayname)
+      |> Map.put("membership", "join")
 
     %Event{
       Event.new(room, sender)
       | type: "m.room.member",
         state_key: mxid,
-        content: %{
-          "membership" => "join"
-        }
+        content: content
     }
   end
 end
@@ -50,6 +55,7 @@ end
 
 defmodule Architex.Event.PowerLevels do
   alias Architex.{Event, Account, Room}
+  alias Architex.Types.UserId
   alias ArchitexWeb.Client.Request.CreateRoom
   alias ArchitexWeb.Client.Request.CreateRoom.PowerLevelContentOverride
 
@@ -67,7 +73,7 @@ defmodule Architex.Event.PowerLevels do
           Room.t(),
           Account.t(),
           CreateRoom.PowerLevelContentOverride.t(),
-          [String.t()] | nil,
+          [UserId.t()] | nil,
           String.t() | nil
         ) :: %Event{}
   def create_room_new(room, sender, nil, invite_ids, preset) do
@@ -101,7 +107,7 @@ defmodule Architex.Event.PowerLevels do
     # This overrides the content override, but the spec is not clear on this.
     users =
       if preset == "trusted_private_chat" and invite_ids do
-        invite_users_pls = Enum.into(invite_ids, %{}, &{&1, creator_pl})
+        invite_users_pls = Enum.into(invite_ids, %{}, &{to_string(&1), creator_pl})
         Map.merge(users, invite_users_pls)
       else
         users
@@ -216,9 +222,19 @@ end
 defmodule Architex.Event.Invite do
   alias Architex.{Event, Account, Room}
 
-  @spec new(Room.t(), Account.t(), String.t(), boolean() | nil) :: %Event{}
-  def new(room, sender, user_id, is_direct \\ nil) do
-    content = %{"membership" => "invite"}
+  @spec new(
+          Room.t(),
+          Account.t(),
+          String.t(),
+          String.t() | nil,
+          String.t() | nil,
+          boolean() | nil
+        ) :: %Event{}
+  def new(room, sender, user_id, avatar_url, displayname, is_direct \\ nil) do
+    content =
+      Event.default_membership_content(avatar_url, displayname)
+      |> Map.put("membership", "invite")
+
     content = if is_direct != nil, do: Map.put(content, "is_direct", is_direct), else: content
 
     %Event{
@@ -234,14 +250,16 @@ defmodule Architex.Event.Leave do
   alias Architex.{Event, Account, Room}
 
   @spec new(Room.t(), Account.t()) :: %Event{}
-  def new(room, sender) do
+  def new(room, %Account{avatar_url: avatar_url, displayname: displayname} = sender) do
+    content =
+      Event.default_membership_content(avatar_url, displayname)
+      |> Map.put("membership", "leave")
+
     %Event{
       Event.new(room, sender)
       | type: "m.room.member",
         state_key: Account.get_mxid(sender),
-        content: %{
-          "membership" => "leave"
-        }
+        content: content
     }
   end
 end
@@ -249,9 +267,19 @@ end
 defmodule Architex.Event.Kick do
   alias Architex.{Event, Account, Room}
 
-  @spec new(Room.t(), Account.t(), String.t(), String.t() | nil) :: %Event{}
-  def new(room, sender, user_id, reason \\ nil) do
-    content = %{"membership" => "leave"}
+  @spec new(
+          Room.t(),
+          Account.t(),
+          String.t(),
+          String.t() | nil,
+          String.t() | nil,
+          String.t() | nil
+        ) :: %Event{}
+  def new(room, sender, user_id, avatar_url, displayname, reason \\ nil) do
+    content =
+      Event.default_membership_content(avatar_url, displayname)
+      |> Map.put("membership", "leave")
+
     content = if reason, do: Map.put(content, "reason", reason), else: content
 
     %Event{
@@ -266,9 +294,19 @@ end
 defmodule Architex.Event.Ban do
   alias Architex.{Event, Account, Room}
 
-  @spec new(Room.t(), Account.t(), String.t(), String.t() | nil) :: %Event{}
-  def new(room, sender, user_id, reason \\ nil) do
-    content = %{"membership" => "ban"}
+  @spec new(
+          Room.t(),
+          Account.t(),
+          String.t(),
+          String.t() | nil,
+          String.t() | nil,
+          String.t() | nil
+        ) :: %Event{}
+  def new(room, sender, user_id, avatar_url, displayname, reason \\ nil) do
+    content =
+      Event.default_membership_content(avatar_url, displayname)
+      |> Map.put("membership", "ban")
+
     content = if reason, do: Map.put(content, "reason", reason), else: content
 
     %Event{
@@ -283,15 +321,17 @@ end
 defmodule Architex.Event.Unban do
   alias Architex.{Event, Account, Room}
 
-  @spec new(Room.t(), Account.t(), String.t()) :: %Event{}
-  def new(room, sender, user_id) do
+  @spec new(Room.t(), Account.t(), String.t(), String.t() | nil, String.t() | nil) :: %Event{}
+  def new(room, sender, avatar_url, displayname, user_id) do
+    content =
+      Event.default_membership_content(avatar_url, displayname)
+      |> Map.put("membership", "leave")
+
     %Event{
       Event.new(room, sender)
       | type: "m.room.member",
         state_key: user_id,
-        content: %{
-          "membership" => "leave"
-        }
+        content: content
     }
   end
 end

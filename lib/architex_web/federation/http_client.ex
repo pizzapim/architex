@@ -33,6 +33,8 @@ defmodule ArchitexWeb.Federation.HTTPClient do
   """
   @spec client(String.t()) :: Tesla.Client.t()
   def client(server_name) do
+    # TODO: When implementing resolving homeservers, probably create
+    # a homeserver struct instead of using domain names directly.
     Tesla.client(
       [
         {Tesla.Middleware.Opts, [server_name: server_name]},

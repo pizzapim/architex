@@ -1,6 +1,8 @@
 defmodule ArchitexWeb.Client.Request.CreateRoom do
   use ArchitexWeb.APIRequest
 
+  alias Architex.Types.UserId
+
   defmodule PowerLevelContentOverride do
     use Ecto.Schema
 
@@ -97,7 +99,7 @@ defmodule ArchitexWeb.Client.Request.CreateRoom do
           room_alias_name: String.t() | nil,
           name: String.t() | nil,
           topic: String.t() | nil,
-          invite: list(String.t()) | nil,
+          invite: [UserId.t()] | nil,
           room_version: String.t() | nil,
           preset: String.t() | nil,
           is_direct: boolean() | nil,
@@ -113,7 +115,7 @@ defmodule ArchitexWeb.Client.Request.CreateRoom do
     field :room_alias_name, :string
     field :name, :string
     field :topic, :string
-    field :invite, {:array, :string}
+    field :invite, {:array, UserId}
     field :room_version, :string
     field :preset, :string
     field :is_direct, :boolean
