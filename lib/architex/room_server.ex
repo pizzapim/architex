@@ -189,6 +189,17 @@ defmodule Architex.RoomServer do
     GenServer.call(pid, {:send_state_event, account, event_type, content, state_key})
   end
 
+  @doc """
+  Get the current state of a room.
+  If the requesting user is not a member of the room,
+  get the state when the user left the room.
+  If the user has never been in the room, return an error.
+  """
+  @spec get_current_state(pid(), Account.t()) :: {:ok, [Event.t()]} | :error
+  def get_current_state(pid, account) do
+    GenServer.call(pid, {:get_current_state, account})
+  end
+
   ### Implementation
 
   @impl true
@@ -421,6 +432,24 @@ defmodule Architex.RoomServer do
 
       {:error, reason} ->
         {:reply, {:error, reason}, state}
+    end
+  end
+
+  def handle_call({:get_current_state, account}, _from, %{state_set: state_set} = state) do
+    mxid = Account.get_mxid(account)
+
+    case state_set[{"m.room.member", mxid}] do
+      %Event{content: %{"membership" => "join"}} ->
+        # Get the current state of the room.
+        {:reply, {:ok, Map.values(state_set)}, state}
+
+      %Event{content: %{"membership" => "leave"}} = event ->
+        # Get the state of the room, after leaving.
+        state_set = StateResolution.resolve(event)
+        {:reply, {:ok, Map.values(state_set)}, state}
+
+      _ ->
+        {:reply, :error, state}
     end
   end
 

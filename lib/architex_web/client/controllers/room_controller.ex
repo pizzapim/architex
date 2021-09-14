@@ -311,4 +311,33 @@ defmodule ArchitexWeb.Client.RoomController do
       {:error, _} -> put_error(conn, :bad_json)
     end
   end
+
+  @doc """
+  Get the state events for the current state of a room.
+
+  Action for GET /_matrix/client/r0/rooms/{roomId}/state.
+  """
+  def state(%Conn{assigns: %{account: account}} = conn, %{"room_id" => room_id}) do
+    case RoomServer.get_room_server(room_id) do
+      {:ok, pid} ->
+        case RoomServer.get_current_state(pid, account) do
+          {:ok, events} ->
+            events = Enum.map(events, &Event.Formatters.state_response/1)
+
+            conn
+            |> put_status(200)
+            |> json(events)
+
+          :error ->
+            put_error(
+              conn,
+              :forbidden,
+              "You aren't a member of the room and weren't previously a member of the room."
+            )
+        end
+
+      {:error, :not_found} ->
+        put_error(conn, :not_found, "The given room was not found.")
+    end
+  end
 end
