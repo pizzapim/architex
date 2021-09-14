@@ -5,18 +5,19 @@ defmodule Architex.Room do
   import Ecto.Query
 
   alias Architex.{Repo, Room, Event, Alias, RoomServer, Account}
+  alias Architex.Types.StateSet
   alias ArchitexWeb.Client.Request.{CreateRoom, Messages}
 
   @type t :: %__MODULE__{
           visibility: :public | :private,
-          state: list(list(String.t())),
+          state_set: StateSet.t(),
           forward_extremities: list(String.t())
         }
 
   @primary_key {:id, :string, []}
   schema "rooms" do
     field :visibility, Ecto.Enum, values: [:public, :private]
-    field :state, {:array, {:array, :string}}
+    field :state_set, StateSet, load_in_query: false
     field :forward_extremities, {:array, :string}
     has_many :events, Event, foreign_key: :room_id
     has_many :aliases, Alias, foreign_key: :room_id

@@ -14,7 +14,7 @@ defmodule Architex.Repo.Migrations.CreateInitialTables do
 
     create table(:rooms, primary_key: false) do
       add :id, :string, primary_key: true
-      add :state, {:array, {:array, :string}}, default: [], null: false
+      add :state_set, {:array, :string}, default: [], null: false
       add :forward_extremities, {:array, :string}, default: [], null: false
       add :visibility, :string, null: false, default: "public"
     end
