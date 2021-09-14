@@ -200,6 +200,12 @@ defmodule Architex.RoomServer do
     GenServer.call(pid, {:get_current_state, account})
   end
 
+  @spec get_state_event(pid(), Account.t(), String.t(), String.t()) ::
+          {:ok, map()} | {:error, :unauthorized} | {:error, :not_found}
+  def get_state_event(pid, account, event_type, state_key) do
+    GenServer.call(pid, {:get_state_event, account, event_type, state_key})
+  end
+
   ### Implementation
 
   @impl true
@@ -445,11 +451,43 @@ defmodule Architex.RoomServer do
 
       %Event{content: %{"membership" => "leave"}} = event ->
         # Get the state of the room, after leaving.
+        # TODO: This does not work properly, as a user's membership can change to "leave"
+        # even after they left/are banned.
+        # I think it is best to seperately keep track when a user left, maybe in the
+        # Membership table.
         state_set = StateResolution.resolve(event)
         {:reply, {:ok, Map.values(state_set)}, state}
 
       _ ->
         {:reply, :error, state}
+    end
+  end
+
+  def handle_call(
+        {:get_state_event, account, event_type, state_key},
+        _from,
+        %{state_set: state_set} = state
+      ) do
+    mxid = Account.get_mxid(account)
+
+    case state_set[{"m.room.member", mxid}] do
+      %Event{content: %{"membership" => "join"}} ->
+        case state_set[{event_type, state_key}] do
+          %Event{content: content} -> {:reply, {:ok, content}, state}
+          nil -> {:reply, {:error, :not_found}, state}
+        end
+
+      %Event{content: %{"membership" => "leave"}} = event ->
+        # TODO: See get_current_state.
+        state_set = StateResolution.resolve(event)
+
+        case state_set[{event_type, state_key}] do
+          %Event{content: content} -> {:reply, {:ok, content}, state}
+          nil -> {:reply, {:error, :not_found}, state}
+        end
+
+      _ ->
+        {:reply, {:error, :unauthorized}, state}
     end
   end
 

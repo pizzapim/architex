@@ -317,7 +317,7 @@ defmodule ArchitexWeb.Client.RoomController do
 
   Action for GET /_matrix/client/r0/rooms/{roomId}/state.
   """
-  def state(%Conn{assigns: %{account: account}} = conn, %{"room_id" => room_id}) do
+  def get_state(%Conn{assigns: %{account: account}} = conn, %{"room_id" => room_id}) do
     case RoomServer.get_room_server(room_id) do
       {:ok, pid} ->
         case RoomServer.get_current_state(pid, account) do
@@ -334,6 +334,48 @@ defmodule ArchitexWeb.Client.RoomController do
               :forbidden,
               "You aren't a member of the room and weren't previously a member of the room."
             )
+        end
+
+      {:error, :not_found} ->
+        put_error(conn, :not_found, "The given room was not found.")
+    end
+  end
+
+  @doc """
+  Looks up the contents of a state event in a room.
+
+  Action for GET /_matrix/client/r0/rooms/{roomId}/state/{eventType}/{stateKey}.
+  """
+  def get_state_event(conn, %{"state_key" => [state_key | _]} = params) do
+    do_get_state_event(conn, params, state_key)
+  end
+
+  def get_state_event(conn, params) do
+    do_get_state_event(conn, params, "")
+  end
+
+  defp do_get_state_event(
+         %Conn{assigns: %{account: account}} = conn,
+         %{"room_id" => room_id, "event_type" => event_type},
+         state_key
+       ) do
+    case RoomServer.get_room_server(room_id) do
+      {:ok, pid} ->
+        case RoomServer.get_state_event(pid, account, event_type, state_key) do
+          {:ok, content} ->
+            conn
+            |> put_status(200)
+            |> json(content)
+
+          {:error, :unauthorized} ->
+            put_error(
+              conn,
+              :forbidden,
+              "You aren't a member of the room and weren't previously a member of the room."
+            )
+
+          {:error, :not_found} ->
+            put_error(conn, :not_found, "The room has no state with the given type or key.")
         end
 
       {:error, :not_found} ->

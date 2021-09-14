@@ -61,12 +61,15 @@ defmodule ArchitexWeb.Router do
 
     scope "/r0" do
       get "/account/whoami", AccountController, :whoami
-      post "/logout", AccountController, :logout
-      post "/logout/all", AccountController, :logout_all
       post "/createRoom", RoomController, :create
       get "/joined_rooms", RoomController, :joined_rooms
       get "/capabilities", InfoController, :capabilities
       get "/sync", SyncController, :sync
+
+      scope "/logout" do
+        post "/", AccountController, :logout
+        post "/all", AccountController, :logout_all
+      end
 
       scope "/profile/:user_id" do
         put "/avatar_url", ProfileController, :set_avatar_url
@@ -89,8 +92,12 @@ defmodule ArchitexWeb.Router do
         get "/messages", RoomController, :messages
 
         scope "/state" do
-          get "/", RoomController, :state
-          put "/:event_type/*state_key", RoomController, :send_state_event
+          get "/", RoomController, :get_state
+
+          scope "/:event_type/*state_key" do
+            get "/", RoomController, :get_state_event
+            put "/", RoomController, :send_state_event
+          end
         end
       end
     end
