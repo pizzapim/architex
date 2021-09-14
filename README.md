@@ -78,7 +78,7 @@ Here, implemented and some unimplemented features are listed.
 - GET /_matrix/federation/v1/state/{roomId}
 - GET /_matrix/federation/v1/state_ids/{roomId}
 - GET /_matrix/key/v2/server/{keyId}
-- GET /_matrix/federation/v1/query/profile: Except displayname and avatar_url is not implemented.
+- GET /_matrix/federation/v1/query/profile
 
 ### Major unimplemented features
 
